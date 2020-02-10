@@ -1,0 +1,323 @@
+
+We are now at the point where we have a good incoming client stream or request to work with.
+
+First, let's briefly go over the basic communication sequence between an HTTP client and server.
+
+At the TCP level,  there is the initial handshake.
+Without going into too much detail, the communications between the client and server
+go more or less like so:
+
+the client sends a SYN packet
+the server responds with a SYN-ACK
+and then the client responds back with an ACK.
+
+client      < ----- >    server
+---------------------------------
+  SYN            --->
+             <---         SYN-ACK
+  ACK            --->
+
+At that point we are ready to start with the HTTP protocol.
+
+A basic http interaction could be:
+
+HTTP/1.1  /  GET
+
+HTTP/1.1 200 OK
+
+
+
+I ran Wireshark while I was using both the curl command, and then the Firefox browser, to hit our http server, and there were some differences.
+
+With curl, after the handshake, it sent an http HEAD request.
+
+Whereas using the browser, it sent an http GET request, and it repeated that request several times.
+
+In both cases though, the clients think there is a problem - and it is because our server
+isn't really responding.
+
+it IS responding correctly with the initial TCP handshake, but not responding at the higher http protocol level.
+
+So we want to start changing our server's behavior.
+
+Now that we have a handle to the client, we can do this.
+
+
+Step 1 - create a function to handle that request.
+---------------------------------------------------------------
+            Ok(_stream) => {
+                            handle_client_request(_stream);
+                        }
+
+            _      => println!("There was an error...")
+
+        }
+
+    }
+}
+
+fn handle_client_request(stream) {
+    println!("Handling request....{:?}", stream);
+
+}
+
+error: expected one of `:`, `@`, or `|`, found `)`
+  --> src/main.rs:34:32
+   |
+34 | fn handle_client_request(stream) {
+   |                                ^ expected one of `:`, `@`, or `|`
+   |
+
+
+
+We need to add the type to the func param - TcpStream.
+
+We know it's TcpStream from running it before any changes:
+
+Starting server....
+TcpListener { addr: V4(127.0.0.1:8594), fd: 3 }
+Server listening for http://localhost:8594
+Got incoming connection request...
+Ok(TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:54052), fd: 4 })
+Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:54052), fd: 4 }
+
+
+
+
+
+error[E0412]: cannot find type `TcpStream` in this scope
+  --> src/main.rs:34:33
+   |
+34 | fn handle_client_request(stream:TcpStream) {
+   |                                 ^^^^^^^^^ not found in this scope
+  
+
+
+
+
+We need to tell the compiler about the TcpStream type - we add a 'use' statement.
+
+We run and hit it with curl:
+
+Starting server....
+TcpListener { addr: V4(127.0.0.1:8594), fd: 3 }
+Server listening for http://localhost:8594
+Got incoming connection request...
+Ok(TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:54091), fd: 4 })
+Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:54091), fd: 4 }
+Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:54091), fd: 4 }
+
+
+
+We are now ready to have our server respond with the "HTTP/1.1 200 OK"
+
+
+fn handle_client_request(stream:TcpStream) {
+    println!("Handling request....{:?}", stream);
+
+    let response = "HTTP/1.1 200 OK \r\n\r\n";
+    stream.write(response);
+
+}
+
+
+
+error[E0599]: no method named `write` found for type `std::net::TcpStream` in the current scope
+  --> src/main.rs:43:12
+   |
+43 |     stream.write(response);
+   |            ^^^^^ method not found in `std::net::TcpStream`
+   |
+   = help: items from traits can only be used if the trait is in scope
+help: the following trait is implemented but not in scope; perhaps add a `use` for it:
+   |
+2  | use std::io::Write;
+   |
+
+
+So we add another "use" statement.
+
+
+error[E0308]: mismatched types
+  --> src/main.rs:44:18
+   |
+44 |     stream.write(response);
+   |                  ^^^^^^^^ expected slice `[u8]`, found `str`
+   |
+   = note: expected reference `&[u8]`
+              found reference `&str`
+
+
+
+
+fn handle_client_request(stream:TcpStream) {
+    println!("Handling request....{:?}", stream);
+    let response = "HTTP/1.1 200 OK \r\n\r\n";
+    stream.write(response.as_bytes());
+
+}
+
+
+error[E0596]: cannot borrow `stream` as mutable, as it is not declared as mutable
+  --> src/main.rs:44:5
+   |
+38 | fn handle_client_request(stream:TcpStream) {
+   |                          ------ help: consider changing this to be mutable: `mut stream`
+...
+44 |     stream.write(response.as_bytes());
+   |     ^^^^^^ cannot borrow as mutable
+
+
+
+fn handle_client_request(stream:TcpStream) {
+    println!("Handling request....{:?}", stream);
+
+    let response = "HTTP/1.1 200 OK \r\n\r\n";
+
+
+    stream.write(response.as_bytes());
+
+}
+
+
+warning: unused `std::result::Result` that must be used
+  --> src/main.rs:44:5
+   |
+44 |     stream.write(response.as_bytes());
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_must_use)]` on by default
+   = note: this `Result` may be an `Err` variant, which should be handled
+
+
+
+fn handle_client_request(mut stream:TcpStream) -> Result<(),()> {
+    println!("Handling request....{:?}", stream);
+
+    let response = "HTTP/1.1 200 OK \r\n\r\n";
+
+
+    let result = stream.write(response.as_bytes());
+
+    return result;
+}
+
+error[E0308]: mismatched types
+  --> src/main.rs:46:12
+   |
+38 | fn handle_client_request(mut stream:TcpStream) -> Result<(),()> {
+   |                                                   ------------- expected `std::result::Result<(), ()>` because of return type
+...
+46 |     return result;
+   |            ^^^^^^ expected `()`, found `usize`
+   |
+   = note: expected enum `std::result::Result<(), ()>`
+              found enum `std::result::Result<usize, std::io::Error>`
+
+
+
+so we need:
+
+fn handle_client_request(mut stream:TcpStream) -> Result<usize,Error> {
+    println!("Handling request....{:?}", stream);
+
+    let response = "HTTP/1.1 200 OK \r\n\r\n";
+
+
+    let result = stream.write(response.as_bytes());
+
+    return result;
+}
+
+
+But what is "usize" ?
+
+
+usize gives you the guarantee to be always big enough to hold any pointer or any offset in a data structure, while u32 can be too small on some architectures.
+As an example, on a 32 bit x86 computer, usize = u32, while on x86_64 computers, usize = u64.
+
+we run the change above:
+
+error[E0412]: cannot find type `Error` in this scope
+  --> src/main.rs:38:64
+   |
+38 | fn handle_client_request(mut stream:TcpStream) -> Result<usize,Error> {
+   |                                                                ^^^^^ not found in this scope
+   |
+help: possible candidates are found in other modules, you can import them into scope
+   |
+2  | use core::fmt::Error;
+   |
+2  | use std::error::Error;
+   |
+2  | use std::fmt::Error;
+   |
+2  | use std::io::Error;
+
+
+
+
+After adding the "use" and re-running:
+
+warning: unused `std::result::Result` that must be used
+  --> src/main.rs:28:29
+   |
+28 | ...                   handle_client_request(_stream);
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_must_use)]` on by default
+   = note: this `Result` may be an `Err` variant, which should be handled
+
+
+we essentially just moved the problem from within the handle function, up to the main function.
+
+So for now, let's just handle the result within the handle function.
+
+
+fn handle_client_request(mut stream:TcpStream) {
+    println!("Handling request....{:?}", stream);
+
+    let response = "HTTP/1.1 200 OK \r\n\r\n";
+
+
+    let result = stream.write(response.as_bytes());
+
+    match result {
+        Ok(_size) => println!("{:?}", _size),
+
+        Err(_err) => println!("{:?}", _err)
+
+    }
+}
+
+Starting server....
+TcpListener { addr: V4(127.0.0.1:8594), fd: 3 }
+Server listening for http://localhost:8594
+
+
+
+
+Got incoming connection request...
+Ok(TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:56725), fd: 4 })
+Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:56725), fd: 4 }
+Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:56725), fd: 4 }
+20
+
+    EliezerC@L07705EliezerC MINGW64 /c/Projects/automation.logs
+    $ curl -s -I http://localhost:8594
+    HTTP/1.1 200 OK
+
+
+No.	Time	Source	Destination	Protocol	Length	Info
+1	0.000000	127.0.0.1	127.0.0.1	TCP	56	59590 → 8594 [SYN] Seq=0 Win=65535 Len=0 MSS=65495 WS=256 SACK_PERM=1
+2	0.000403	127.0.0.1	127.0.0.1	TCP	56	8594 → 59590 [SYN, ACK] Seq=0 Ack=1 Win=65535 Len=0 MSS=65495 WS=256 SACK_PERM=1
+3	0.000513	127.0.0.1	127.0.0.1	TCP	44	59590 → 8594 [ACK] Seq=1 Ack=1 Win=2619648 Len=0
+4	0.000998	127.0.0.1	127.0.0.1	TCP	64	8594 → 59590 [PSH, ACK] Seq=1 Ack=1 Win=2619648 Len=20 [TCP segment of a reassembled PDU]
+5	0.001051	127.0.0.1	127.0.0.1	TCP	44	59590 → 8594 [ACK] Seq=1 Ack=21 Win=2619648 Len=0
+6	0.001106	127.0.0.1	127.0.0.1	HTTP	405	GET / HTTP/1.1 
+7	0.001132	127.0.0.1	127.0.0.1	TCP	44	8594 → 59590 [ACK] Seq=21 Ack=362 Win=2619392 Len=0
+8	0.001242	127.0.0.1	127.0.0.1	HTTP	44	HTTP/1.1 200 OK  
+9	0.001299	127.0.0.1	127.0.0.1	TCP	44	59590 → 8594 [ACK] Seq=362 Ack=22 Win=2619648 Len=0
+10	0.002522	127.0.0.1	127.0.0.1	TCP	44	59590 → 8594 [FIN, ACK] Seq=362 Ack=22 Win=2619648 Len=0
+11	0.002595	127.0.0.1	127.0.0.1	TCP	44	8594 → 59590 [ACK] Seq=22 Ack=363 Win=2619392 Len=0
+
