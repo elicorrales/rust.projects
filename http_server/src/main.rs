@@ -1,5 +1,8 @@
 
 use std::net::TcpListener;
+use std::net::TcpStream;
+use std::io::Write;
+use std::io::Error;
 
 const IP:&str = "localhost:8594";
 
@@ -20,11 +23,26 @@ fn main() {
 
         match result {
 
-            Ok(_stream) => println!("Handling request....{:?}", _stream),
+            Ok(_stream) => {
+                            println!("Handling request....{:?}", _stream);
+                            let resp_result = handle_client_request(_stream);
+                            println!("{:?}", resp_result);
+                            match resp_result {
+                                Ok(ok_var) => println!("{:?}", ok_var),
+                                Err(err_var) => println!("{:?}", err_var)
+                            }
+                        }
 
             _      => println!("There was an error...")
 
         }
-
     }
+}
+
+fn handle_client_request(mut stream:TcpStream) -> Result<usize,Error> {
+    println!("Inside request handler: {:?}", stream);
+
+    let response = "HTTP/1.1 200 OK \r\n\r\n";
+    let result = stream.write(response.as_bytes());
+    return result;
 }

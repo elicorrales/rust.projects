@@ -1,0 +1,81 @@
+1) create a rust rocket server project directory.
+
+2) cd to directory, run 'cargo init'.
+
+3) edit Cargo.toml, add 'rocket = "*"'  dependency.
+
+4) go to https://rocket.rs/, copy the Hello Rocket code, or:
+
+--------------------------------------------------------------
+#![feature(proc_macro_hygiene, decl_macro)]
+
+#[macro_use] extern crate rocket;
+
+#[get("/hello/<name>/<age>")]
+fn hello(name: String, age: u8) -> String {
+    format!("Hello, {} year old named {}!", age, name)
+}
+
+fn main() {
+    rocket::ignite().mount("/", routes![hello]).launch();
+}
+
+-------------------------------------------------------------- 
+
+5) Paste the above code into src/main.rs (removing the default code).
+
+6) Back at command-line for the project, do 'rustup override set nightly'
+   We need 'nightly' for rocket, due to another dependency.
+
+8) Verify by doing 'rustc --version' .  It should say nightly.
+
+
+9) Do 'cargo run' should build and run, and be listening at port 8000.
+
+10) In another terminal, do 'curl -s -I http://localhost:8000'.
+
+On curl terminal, you should get:
+
+-------------------------------------------------
+HTTP/1.1 404 Not Found
+Content-Type: text/html; charset=utf-8
+Server: Rocket
+Content-Length: 496
+Date: Tue, 11 Feb 2020 23:37:22 GMT
+-------------------------------------------------
+
+and on rust rocket server terminal, you should get:
+
+--------------------------------------------------
+    => GET /hello/<name>/<age> (hello)
+🚀 Rocket has launched from http://localhost:8000
+HEAD /:
+    => Error: No matching routes for HEAD /.
+    => Autohandling HEAD request.
+    => Error: No matching routes for GET /.
+    => Warning: Responding with 404 Not Found catcher.
+    => Response succeeded.
+---------------------------------------------------
+
+11) If instead you do on curl terminal: 'curl -s -I http://localhost:8000/hello/name/10',
+
+you should see in curl terminal:
+
+---------------------------------------------------
+HTTP/1.1 200 OK
+Content-Type: text/plain; charset=utf-8
+Server: Rocket
+Content-Length: 29
+Date: Tue, 11 Feb 2020 23:42:04 GMT
+---------------------------------------------------
+
+and in the rust server terminal:
+---------------------------------------------------
+HEAD /hello/name/10:
+    => Error: No matching routes for HEAD /hello/eli/10.
+    => Autohandling HEAD request.
+    => Matched: GET /hello/<name>/<age> (hello)
+    => Outcome: Success
+    => Response succeeded.
+
+
