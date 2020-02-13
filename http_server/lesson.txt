@@ -1,323 +1,364 @@
+Hello, today's video is hopefully short, and it is an addendum to :
 
-We are now at the point where we have a good incoming client stream or request to work with.
+(show youtube title)
 
-First, let's briefly go over the basic communication sequence between an HTTP client and server.
+Rust Programming Part 2 HTTP Server Using Result Type & Responding To Client
 
-At the TCP level,  there is the initial handshake.
-Without going into too much detail, the communications between the client and server
-go more or less like so:
+So I guess this is Part2a.
 
-the client sends a SYN packet
-the server responds with a SYN-ACK
-and then the client responds back with an ACK.
+In Part 2, we handled sending an OK response from the http server, back to client.
+We saw that response when we used the curl command.
 
-client      < ----- >    server
----------------------------------
-  SYN            --->
-             <---         SYN-ACK
-  ACK            --->
+But what I forgot to do is to first  read the http request from the client.
 
-At that point we are ready to start with the HTTP protocol.
-
-A basic http interaction could be:
-
-HTTP/1.1  /  GET
-
-HTTP/1.1 200 OK
+So we'll do that now, as it introduces other things to learn about Rust.
 
 
+-----------------------------------------------------------------------------------
+First, let's briefly go over how we left the code last, and run it.
 
-I ran Wireshark while I was using both the curl command, and then the Firefox browser, to hit our http server, and there were some differences.
+The main point  here is that we see the OK response in our curl window.
 
-With curl, after the handshake, it sent an http HEAD request.
-
-Whereas using the browser, it sent an http GET request, and it repeated that request several times.
-
-In both cases though, the clients think there is a problem - and it is because our server
-isn't really responding.
-
-it IS responding correctly with the initial TCP handshake, but not responding at the higher http protocol level.
-
-So we want to start changing our server's behavior.
-
-Now that we have a handle to the client, we can do this.
+But we don't see anything related to the original request in our server window.
 
 
-Step 1 - create a function to handle that request.
----------------------------------------------------------------
-            Ok(_stream) => {
-                            handle_client_request(_stream);
-                        }
+-----------------------------------------------------------------------------------
+The first thing to do then is a read from the stream.
 
-            _      => println!("There was an error...")
+    stream.read();
 
-        }
-
-    }
-}
-
-fn handle_client_request(stream) {
-    println!("Handling request....{:?}", stream);
-
-}
-
-error: expected one of `:`, `@`, or `|`, found `)`
-  --> src/main.rs:34:32
+error[E0599]: no method named `read` found for type `std::net::TcpStream` in the current scope
+  --> src/main.rs:48:12
    |
-34 | fn handle_client_request(stream) {
-   |                                ^ expected one of `:`, `@`, or `|`
-   |
-
-
-
-We need to add the type to the func param - TcpStream.
-
-We know it's TcpStream from running it before any changes:
-
-Starting server....
-TcpListener { addr: V4(127.0.0.1:8594), fd: 3 }
-Server listening for http://localhost:8594
-Got incoming connection request...
-Ok(TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:54052), fd: 4 })
-Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:54052), fd: 4 }
-
-
-
-
-
-error[E0412]: cannot find type `TcpStream` in this scope
-  --> src/main.rs:34:33
-   |
-34 | fn handle_client_request(stream:TcpStream) {
-   |                                 ^^^^^^^^^ not found in this scope
-  
-
-
-
-
-We need to tell the compiler about the TcpStream type - we add a 'use' statement.
-
-We run and hit it with curl:
-
-Starting server....
-TcpListener { addr: V4(127.0.0.1:8594), fd: 3 }
-Server listening for http://localhost:8594
-Got incoming connection request...
-Ok(TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:54091), fd: 4 })
-Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:54091), fd: 4 }
-Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:54091), fd: 4 }
-
-
-
-We are now ready to have our server respond with the "HTTP/1.1 200 OK"
-
-
-fn handle_client_request(stream:TcpStream) {
-    println!("Handling request....{:?}", stream);
-
-    let response = "HTTP/1.1 200 OK \r\n\r\n";
-    stream.write(response);
-
-}
-
-
-
-error[E0599]: no method named `write` found for type `std::net::TcpStream` in the current scope
-  --> src/main.rs:43:12
-   |
-43 |     stream.write(response);
-   |            ^^^^^ method not found in `std::net::TcpStream`
+48 |     stream.read();
+   |            ^^^^ method not found in `std::net::TcpStream`
    |
    = help: items from traits can only be used if the trait is in scope
 help: the following trait is implemented but not in scope; perhaps add a `use` for it:
    |
-2  | use std::io::Write;
+2  | use std::io::Read;
    |
 
+-----------------------------------------------------------------------------------
 
-So we add another "use" statement.
+  2 use std::net::TcpListener;
+  3 use std::net::TcpStream;
+  4 use std::io::Read;
+  5 use std::io::Write;
+  6 use std::io::Error;
 
 
-error[E0308]: mismatched types
-  --> src/main.rs:44:18
+error[E0061]: this function takes 1 parameter but 0 parameters were supplied
+  --> src/main.rs:49:12
    |
-44 |     stream.write(response);
-   |                  ^^^^^^^^ expected slice `[u8]`, found `str`
+49 |     stream.read();
+   |            ^^^^ expected 1 parameter
+
+
+-----------------------------------------------------------------------------------
+The parameter expected is some sort of buffer that will hold the incoming request.
+
+We should assume that the incoming request data is more than a single value.
+We know that curl sends a "HEAD / HTTP/1.1";  that's several bytes of data.
+
+That means we need some sort of array.
+
+Let's try this for now:
+
+ 49     let request = [];
+ 50
+ 51     stream.read(request);
+ 
    |
-   = note: expected reference `&[u8]`
-              found reference `&str`
-
-
-
-
-fn handle_client_request(stream:TcpStream) {
-    println!("Handling request....{:?}", stream);
-    let response = "HTTP/1.1 200 OK \r\n\r\n";
-    stream.write(response.as_bytes());
-
-}
-
-
-error[E0596]: cannot borrow `stream` as mutable, as it is not declared as mutable
-  --> src/main.rs:44:5
+51 |     stream.read(request);
+   |                 ^^^^^^^
+   |                 |
+   |                 expected `&mut [u8]`, found array of 0 elements
+   |                 help: consider mutably borrowing here: `&mut request`
    |
-38 | fn handle_client_request(stream:TcpStream) {
-   |                          ------ help: consider changing this to be mutable: `mut stream`
-...
-44 |     stream.write(response.as_bytes());
-   |     ^^^^^^ cannot borrow as mutable
+   = note: expected mutable reference `&mut [u8]`
+                          found array `[_; 0]`
+
+-----------------------------------------------------------------------------------
+Again we see how Rust is very careful about memory.  The key phrase in the error is:
+
+"consider mutably borrowing here: '&mut request'"
+
+ 51     stream.read(&mut request);
 
 
+error[E0596]: cannot borrow `request` as mutable, as it is not declared as mutable
+  --> src/main.rs:51:17
+   |
+49 |     let request = [];
+   |         ------- help: consider changing this to be mutable: `mut request`
+50 |
+51 |     stream.read(&mut request);
+   |                 ^^^^^^^^^^^^ cannot borrow as mutable
 
-fn handle_client_request(stream:TcpStream) {
-    println!("Handling request....{:?}", stream);
 
-    let response = "HTTP/1.1 200 OK \r\n\r\n";
+-----------------------------------------------------------------------------------
+let's make our new array declaration mutable.
 
-
-    stream.write(response.as_bytes());
-
-}
+ 49     let mut request = [];
 
 
 warning: unused `std::result::Result` that must be used
-  --> src/main.rs:44:5
+  --> src/main.rs:51:5
    |
-44 |     stream.write(response.as_bytes());
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+51 |     stream.read(&mut request);
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = note: `#[warn(unused_must_use)]` on by default
    = note: this `Result` may be an `Err` variant, which should be handled
 
-
-
-fn handle_client_request(mut stream:TcpStream) -> Result<(),()> {
-    println!("Handling request....{:?}", stream);
-
-    let response = "HTTP/1.1 200 OK \r\n\r\n";
-
-
-    let result = stream.write(response.as_bytes());
-
-    return result;
-}
-
-error[E0308]: mismatched types
-  --> src/main.rs:46:12
-   |
-38 | fn handle_client_request(mut stream:TcpStream) -> Result<(),()> {
-   |                                                   ------------- expected `std::result::Result<(), ()>` because of return type
-...
-46 |     return result;
-   |            ^^^^^^ expected `()`, found `usize`
-   |
-   = note: expected enum `std::result::Result<(), ()>`
-              found enum `std::result::Result<usize, std::io::Error>`
-
-
-
-so we need:
-
-fn handle_client_request(mut stream:TcpStream) -> Result<usize,Error> {
-    println!("Handling request....{:?}", stream);
-
-    let response = "HTTP/1.1 200 OK \r\n\r\n";
-
-
-    let result = stream.write(response.as_bytes());
-
-    return result;
-}
-
-
-But what is "usize" ?
-
-
-usize gives you the guarantee to be always big enough to hold any pointer or any offset in a data structure, while u32 can be too small on some architectures.
-As an example, on a 32 bit x86 computer, usize = u32, while on x86_64 computers, usize = u64.
-
-we run the change above:
-
-error[E0412]: cannot find type `Error` in this scope
-  --> src/main.rs:38:64
-   |
-38 | fn handle_client_request(mut stream:TcpStream) -> Result<usize,Error> {
-   |                                                                ^^^^^ not found in this scope
-   |
-help: possible candidates are found in other modules, you can import them into scope
-   |
-2  | use core::fmt::Error;
-   |
-2  | use std::error::Error;
-   |
-2  | use std::fmt::Error;
-   |
-2  | use std::io::Error;
-
-
-
-
-After adding the "use" and re-running:
-
-warning: unused `std::result::Result` that must be used
-  --> src/main.rs:28:29
-   |
-28 | ...                   handle_client_request(_stream);
-   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-   = note: `#[warn(unused_must_use)]` on by default
-   = note: this `Result` may be an `Err` variant, which should be handled
-
-
-we essentially just moved the problem from within the handle function, up to the main function.
-
-So for now, let's just handle the result within the handle function.
-
-
-fn handle_client_request(mut stream:TcpStream) {
-    println!("Handling request....{:?}", stream);
-
-    let response = "HTTP/1.1 200 OK \r\n\r\n";
-
-
-    let result = stream.write(response.as_bytes());
-
-    match result {
-        Ok(_size) => println!("{:?}", _size),
-
-        Err(_err) => println!("{:?}", _err)
-
-    }
-}
-
+    Finished dev [unoptimized + debuginfo] target(s) in 1.79s
+     Running `target/debug/http_server`
 Starting server....
 TcpListener { addr: V4(127.0.0.1:8594), fd: 3 }
 Server listening for http://localhost:8594
 
 
 
+It's interesting that it is running - we haven't yet hit it with curl so we dont know how it
+will react since we have declared an empty array.
 
+The above warning we have seen before - the read operation returns a Resutl, so Ok or Error,
+and we need to handle it.
+
+Before we do that, let's go ahead and hit it with a request from curl.
+
+
+Starting server....
+TcpListener { addr: V4(127.0.0.1:8594), fd: 3 }
+Server listening for http://localhost:8594
 Got incoming connection request...
-Ok(TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:56725), fd: 4 })
-Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:56725), fd: 4 }
-Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:56725), fd: 4 }
-20
-
-    EliezerC@L07705EliezerC MINGW64 /c/Projects/automation.logs
-    $ curl -s -I http://localhost:8594
-    HTTP/1.1 200 OK
+Ok(TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59432), fd: 4 })
+Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59432), fd: 4 }
+Inside handle_client_request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59432), fd: 4 }
 
 
-No.	Time	Source	Destination	Protocol	Length	Info
-1	0.000000	127.0.0.1	127.0.0.1	TCP	56	59590 → 8594 [SYN] Seq=0 Win=65535 Len=0 MSS=65495 WS=256 SACK_PERM=1
-2	0.000403	127.0.0.1	127.0.0.1	TCP	56	8594 → 59590 [SYN, ACK] Seq=0 Ack=1 Win=65535 Len=0 MSS=65495 WS=256 SACK_PERM=1
-3	0.000513	127.0.0.1	127.0.0.1	TCP	44	59590 → 8594 [ACK] Seq=1 Ack=1 Win=2619648 Len=0
-4	0.000998	127.0.0.1	127.0.0.1	TCP	64	8594 → 59590 [PSH, ACK] Seq=1 Ack=1 Win=2619648 Len=20 [TCP segment of a reassembled PDU]
-5	0.001051	127.0.0.1	127.0.0.1	TCP	44	59590 → 8594 [ACK] Seq=1 Ack=21 Win=2619648 Len=0
-6	0.001106	127.0.0.1	127.0.0.1	HTTP	405	GET / HTTP/1.1 
-7	0.001132	127.0.0.1	127.0.0.1	TCP	44	8594 → 59590 [ACK] Seq=21 Ack=362 Win=2619392 Len=0
-8	0.001242	127.0.0.1	127.0.0.1	HTTP	44	HTTP/1.1 200 OK  
-9	0.001299	127.0.0.1	127.0.0.1	TCP	44	59590 → 8594 [ACK] Seq=362 Ack=22 Win=2619648 Len=0
-10	0.002522	127.0.0.1	127.0.0.1	TCP	44	59590 → 8594 [FIN, ACK] Seq=362 Ack=22 Win=2619648 Len=0
-11	0.002595	127.0.0.1	127.0.0.1	TCP	44	8594 → 59590 [ACK] Seq=22 Ack=363 Win=2619392 Len=0
+EliezerC@L07705EliezerC MINGW64 ~
+$ curl -s -I http://localhost:8594
+HTTP/1.1 200 OK
+
+
+
+No apparent errors or blow up.
+
+
+
+-----------------------------------------------------------------------------------
+Since we are trying to read the incoming request string, the only thing we're going
+to do with it is print it to our server window.
+
+First, though, let's handle that warning for the Result Ok or Error.
+
+ 51     let req_result = stream.read(&mut request);
+ 52     match req_result {
+ 53         Ok(ok_var) => println!("OK:  {:?}", ok_var),
+ 54         Err(err_var) => println!("Err:  {:?}", err_var),
+ 55     }
+
+
+Ok, it ran and no warnings.
+
+-----------------------------------------------------------------------------------
+Now let's work on displaing the incoming request string to the server window.
+
+ 57     println!("Incoming request: {:?}", request);
+
+
+Starting server....
+TcpListener { addr: V4(127.0.0.1:8594), fd: 3 }
+Server listening for http://localhost:8594
+Got incoming connection request...
+Ok(TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59537), fd: 4 })
+Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59537), fd: 4 }
+Inside handle_client_request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59537), fd: 4 }
+OK:  0
+Incoming request: []
+After handle Ok:  20
+
+
+So it didnt blow , just didn't capture anything - since we declared an empty array.
+
+-----------------------------------------------------------------------------------
+What if we give the array some size?
+
+
+ 49     let mut request = [0;5];
+ 50     println!("New request array : {:?}", request);
+ 51
+ 52     let req_result = stream.read(&mut request);
+ 53     match req_result {
+ 54         Ok(ok_var) => println!("OK:  {:?}", ok_var),
+ 55         Err(err_var) => println!("Err:  {:?}", err_var),
+ 56     }
+ 57
+ 58     println!("Incoming request: {:?}", request);
+ 
+
+
+Starting server....
+TcpListener { addr: V4(127.0.0.1:8594), fd: 3 }
+Server listening for http://localhost:8594
+Got incoming connection request...
+Ok(TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59607), fd: 4 })
+Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59607), fd: 4 }
+Inside handle_client_request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59607), fd: 4 }
+New request array : [0, 0, 0, 0, 0]
+OK:  5
+Incoming request: [72, 69, 65, 68, 32]
+After handle Ok:  20
+
+
+-----------------------------------------------------------------------------------
+The compiler seems to have inferred the type of array based on the initialization.
+
+Seems like we have some bytes.  We want to turn that into something meaningful.
+
+There are probably way better ways to do this, but one way I found is to attempt
+a method that may not exist, and we then get the type from the compiler.
+
+like so:
+
+ 58     println!("Incoming request: {:?}", request);
+ 59
+ 60     println!("Incoming request: {:?}", request.unwrap());
+ 
+
+error[E0599]: no method named `unwrap` found for type `[u8; 5]` in the current scope
+  --> src/main.rs:60:48
+   |
+60 |     println!("Incoming request: {:?}", request.unwrap());
+   |                                                ^^^^^^ method not found in `[u8; 5]`
+
+
+So now we know that we have a byte array .   8-bit bytes.  Not integer array.
+
+
+-----------------------------------------------------------------------------------
+Let's try converting the byte array into a string or somethjng like that.
+
+After some researching:
+
+ 60     let btyes_to_string = std::str::from_utf8(request);
+
+error[E0308]: mismatched types
+  --> src/main.rs:60:47
+   |
+60 |     let btyes_to_string = std::str::from_utf8(request);
+   |                                               ^^^^^^^
+   |                                               |
+   |                                               expected `&[u8]`, found array `[u8; 5]`
+   |                                               help: consider borrowing here: `&request`
+
+
+-----------------------------------------------------------------------------------
+ 60     let btyes_to_string = std::str::from_utf8(&request);
+
+warning: unused variable: `btyes_to_string`
+  --> src/main.rs:60:9
+   |
+60 |     let btyes_to_string = std::str::from_utf8(&request);
+   |         ^^^^^^^^^^^^^^^ help: consider prefixing with an underscore: `_btyes_to_string`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+-----------------------------------------------------------------------------------
+no warnings.  let's print that new string:
+
+ 58     println!("Incoming request bytes: {:?}", request);
+ 59
+ 60     let _btyes_to_string = std::str::from_utf8(&request);
+ 61
+ 62     println!("Incoming request string: {:?}", _bytes_to_string);
+ 
+
+Starting server....
+TcpListener { addr: V4(127.0.0.1:8594), fd: 3 }
+Server listening for http://localhost:8594
+Got incoming connection request...
+Ok(TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59861), fd: 4 })
+Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59861), fd: 4 }
+Inside handle_client_request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59861), fd: 4 }
+New request array : [0, 0, 0, 0, 0]
+OK:  5
+Incoming request bytes: [72, 69, 65, 68, 32]
+Incoming request string: Ok("HEAD ")
+After handle Ok:  20
+
+
+Ok, we got back a   "OK("HEAD ")".   Interesting. Even though we are printing a string(?) ,
+it's an "OK()" wrapping a string.
+
+
+-----------------------------------------------------------------------------------
+So, let's try UNwrapping that Ok().
+
+ 58     println!("Incoming request bytes: {:?}", request);
+ 59
+ 60     let _bytes_to_string = std::str::from_utf8(&request);
+ 61
+ 62     println!("Incoming request string: {:?}", _bytes_to_string);
+ 63
+ 64     let _unwrapped_string = _bytes_to_string.unwrap();
+ 65
+ 66     println!("Incoming request string: {:?}", _unwrapped_string);
+
+
+New request array : [0, 0, 0, 0, 0]
+OK:  5
+Incoming request bytes: [72, 69, 65, 68, 32]
+Incoming request string: Ok("HEAD ")
+Incoming request string: "HEAD "
+After handle Ok:  20
+
+
+And we get the "HEAD" portion of the request by itself.  Pretty cool.
+
+-----------------------------------------------------------------------------------
+Now, the next thing is that we did not get the entire incoming request string.
+
+So let's increase that byte array size.
+
+How about we go for a size of 100 bytes?
+
+ 49     let mut request = [0;100];
+
+error[E0277]: arrays only have std trait implementations for lengths 0..=32
+  --> src/main.rs:50:42
+   |
+50 |     println!("New request array : {:?}", request);
+   |                                          ^^^^^^^ the trait `std::array::LengthAtMost32` is not implemented for `[{integer}; 100]`
+   |
+
+
+
+-----------------------------------------------------------------------------------
+As it turns out, unless we more into Rust, we are limited to a size of 32.
+
+ 49     let mut request = [0;32];
+
+
+Inside handle_client_request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59951), fd: 4 }
+New request array : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+OK:  32
+Incoming request bytes: [72, 69, 65, 68, 32, 47, 32, 72, 84, 84, 80, 47, 49, 46, 49, 13, 10, 72, 111, 115, 116, 58, 32, 108, 111, 99, 97, 108, 104, 111, 115, 116]
+Incoming request string: Ok("HEAD / HTTP/1.1\r\nHost: localhost")
+Incoming request string: "HEAD / HTTP/1.1\r\nHost: localhost"
+After handle Ok:  20
+
+
+Seems the size 32 was just enough to grab most of the incoming HTTP request.
+
+
+
+-----------------------------------------------------------------------------------
+
+Anyway... we shall leave things here.
+
+Next time we shall move onto something new, but related.
+
 

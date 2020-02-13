@@ -1,6 +1,10 @@
 
 use std::net::TcpListener;
 use std::net::TcpStream;
+<<<<<<< HEAD
+=======
+use std::io::Read;
+>>>>>>> 4001fa0dcb02d17d2704f97ba4eee03156b2e3bc
 use std::io::Write;
 use std::io::Error;
 
@@ -41,7 +45,6 @@ fn main() {
 
 fn handle_client_request(mut stream:TcpStream) -> Result<usize,Error> {
     println!("Inside request handler: {:?}", stream);
-
     let response = "HTTP/1.1 200 OK \r\n\r\n";
     let result = stream.write(response.as_bytes());
     return result;
