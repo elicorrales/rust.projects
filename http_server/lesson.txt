@@ -1,17 +1,15 @@
-Hello, today's video is hopefully short, and it is an addendum to :
+Hello, in today's video we take a look at reading incoming data from a client.
 
-(show youtube title)
+It's something we skipped past last time.
 
-Rust Programming Part 2 HTTP Server Using Result Type & Responding To Client
+You may wish to review the two previous videos from the Rust Programming playlist.
 
-So I guess this is Part2a.
+(show youtube playlist)
 
+
+-----------------------------------------------------------------------------------
 In Part 2, we handled sending an OK response from the http server, back to client.
 We saw that response when we used the curl command.
-
-But what I forgot to do is to first  read the http request from the client.
-
-So we'll do that now, as it introduces other things to learn about Rust.
 
 
 -----------------------------------------------------------------------------------
@@ -79,23 +77,196 @@ Let's try this for now:
    = note: expected mutable reference `&mut [u8]`
                           found array `[_; 0]`
 
------------------------------------------------------------------------------------
 Again we see how Rust is very careful about memory.  The key phrase in the error is:
 
 "consider mutably borrowing here: '&mut request'"
 
- 51     stream.read(&mut request);
+So what is "&mut" ?   It is a reference.  It is a mutable reference.
+
+-----------------------------------------------------------------------------------
+Let's go on a bit of a rabbit trail and take a closer look at "mut" and "borrowing".
+
+
+Let's first try something simple;
+
+    let  a = 5;    // 'a' is immutable.  the value of '5' can not be changed.
+    a = 6;         // < ---- this will cause an compiler error.
+
+Now let's create a reference to 'a'.   We'll call the refernce 'b'.
+
+    let b = &a;
+    println!("{}",b); // <-----     b displays value of a ,  which is '5'
+
+Although  I have to say that  the syntax sure looks like C programming, where I
+am saying that 'b' contains the memory address of 'a'.   When I see the word 'reference',
+that takes me back to C++ references, which were not really the same as pointers.
+
+A C++ reference is another name for something.   It does not have to be de-refenced in order
+to deal with the value.
+
+
+However, what I have seen of Rust documentation on the web seems to refer to what we are 
+now looking at, as  references, not pointers.
+
+Anyway, Moving on,
+
+Now let's say that for some reason, we wish to change the value of a from '5' to '6',
+but via the reference.   In other words, using the refernce 'b', we wish to change
+the value '5' (originally assigned to 'a') .
+
+    *b = 6;   //  < ---- again, coming from a C/C++ background, it looks very suspicously like
+              //  we are DE-referencing a pointer, to get at the value.
+
+The above gives us an error, since 'b' by default is an IMMUTABLE refence.
+
+The help suggestion is to have 'b' be assigned a MUTABLE reference .   That is:
+
+    let b = &mut a;    
+
+This supposedly means that whatever value 'b' referers to (in this case the '5'), can be changed.
+
+However, when we try the above, we get yet another error.  And we start getting familiar with 'borrowing'.
+
+With Rust, only one variable can be the owner (at any given moment) of a value.  But there can be borrowing.
+
+Thus, with 'b' refererring to 'a', we are borrowing.   The compiler seems to know we are borrowing because
+it even tell us  where we are doing the borrowing.
+
+
+Now, at this point the compiler gives us several  issues.
+
+--- first, we are trying to say that 'b' referers to something that is mutable, or changeable.
+Meaning that '5' can be changed to '6'.  BUT, the compiler complains because since 'b' is a 
+reference to 'a', and 'a' is not changeable, thus 'b' is also not changeable.
+
+So it suggests that we make 'a' mutable, so that then the 'let b = &mut a;' statement will be valid.
+
+---- second, it seems that we are doing the 'borrowing' even just by printing.   I am not sure,
+but I think that trying to 'a' AFTER having declared 'b' as a "&mut a', means that 'b' is now
+the borrower (or maybe the temporary owner?) and thus print 'a' after, is borrowing.
+
+If we move the print statment of 'a' to BEFORE we create 'b', then we dont see that complaint.
+
+
+In any case, let's take the compiler's suggestion, and make 'a' also mutable.
+
+    let mut a = 5;
+    let b = &mut a;
+    *b = 6;
+
+This (above) works fine.
+
+    print("{}",a);    // <---- adding just this, right afteer, also works.  Value is '6';
+
+BUT, if I attempt to print 'b' after, we have a problem.
+
+
+But this does not:
+
+    print("{}",a);    //  <--- complains of immutable borrowing.
+    print("{}",b);    //  <--- complains of immutable borrowing.
+
+Attempting to print 'b' afterward, creates problems.
+
+   let b = &mut a;
+   |             ------ mutable borrow occurs here
+   println!("a = {}", a);
+   |                    ^ immutable borrow occurs here
+   println!("b = {}",b);
+   |                   - mutable borrow later used here
+
+
+Now, what's really interesing is that if I just swap the two print statements, it works.
+
+
+    print("{}",b);    //  <--- complains of immutable borrowing.
+    print("{}",a);    //  <--- complains of immutable borrowing.
+
+
+One last point about references.... let's try to get 'b' to refer to another variable, such as 'c'.
+
+Let's begin by incorrectly assigning  'b' to 'c'.
+
+    let c = 7;  // this is fine.
+    let b = c;   /// error
+
+    let b = &c;  //still a problem
+
+    let b = &mut c;  //still bad
+
+
+-----------------------------------------------------------------------------------
+So now that we are a bit more familiar with Rust's borrowing, and mutable vs immutable,
+even if we're not really 100% on it, but we have some better sense of things...let's
+go back to trying to read the incomfing request data.
+
+First, we will rollback the handler function to NOT return anything, and to NOT respond either.
+
+We will just concentrate on the reading first.
+
+
+
+
+-----------------------------------------------------------------------------------
+We left things at :
+
+ 60     let request = [];
+ 61     stream.read(request);
+
+
+error[E0308]: mismatched types
+  --> src/main.rs:61:17
+   |
+61 |     stream.read(request);
+   |                 ^^^^^^^
+   |                 |
+   |                 expected `&mut [u8]`, found array of 0 elements
+   |                 help: consider mutably borrowing here: `&mut request`
+
+Now that we know a bit more,  what is the compiler telling us?
+
+The compiler is saying that the 'read()' function can only fill or put the incoming data
+into something that is mutable.   It is also saying that it has to put the data into
+something that existed before the 'read()' function was called.  THus, it must be mutable,
+and it must be a reference to something.
+
+And that's true - we created 'request' as a local empty array.
+
+Let's do the suggestion in two steps.  First, we do it as a reference:
+
+    stream.read(&request);
+
+
+error[E0308]: mismatched types
+  --> src/main.rs:61:30
+   |
+61 |     stream.read(&request);
+   |                              ^^^^^^^^ types differ in mutability
+   |
+   = note: expected mutable reference `&mut [u8]`
+                      found reference `&[_; 0]`
+
+Notice that the error indicates the actual and the expected are both references.
+That's an improvement over previous error.
+
+But one is mutable and one is not.
+
+-----------------------------------------------------------------------------------
+Let's add the 'mut' to the reference.
+
+    stream.read(&mut request);
 
 
 error[E0596]: cannot borrow `request` as mutable, as it is not declared as mutable
-  --> src/main.rs:51:17
+  --> src/main.rs:61:17
    |
-49 |     let request = [];
+60 |     let request = [];
    |         ------- help: consider changing this to be mutable: `mut request`
-50 |
-51 |     stream.read(&mut request);
+61 |     stream.read(&mut request);
    |                 ^^^^^^^^^^^^ cannot borrow as mutable
 
+
+Now it should be obvious to us.   We declared 'request' as IMMUTABLE (the default).
 
 -----------------------------------------------------------------------------------
 let's make our new array declaration mutable.
@@ -119,66 +290,77 @@ TcpListener { addr: V4(127.0.0.1:8594), fd: 3 }
 Server listening for http://localhost:8594
 
 
+Ok so now are program IS working.  It's listening, waiting for the client to hit it.
 
-It's interesting that it is running - we haven't yet hit it with curl so we dont know how it
+
+-----------------------------------------------------------------------------------
+Let's take  care of the warning.  We know from the previous video that functions
+can return a Result, which is an Ok wrapping something, or an Error wrapping something.
+
+So let's assign a new variable to the return of the 'read()' function.
+
+
+    let result = stream.read(&mut request);
+
+warning: unused variable: `result`
+  --> src/main.rs:61:9
+   |
+61 |     let result = stream.read(&mut request);
+   |         ^^^^^^ help: consider prefixing with an underscore: `_result`
+   |
+
+
+We have seen this before.
+
+-----------------------------------------------------------------------------------
+We add the underscore.
+
+    let result = stream.read(&mut request);
+
+
+Ok, the program is running, listening, no warnings, 
+- we haven't yet hit it with curl so we dont know how it
 will react since we have declared an empty array.
 
-The above warning we have seen before - the read operation returns a Resutl, so Ok or Error,
-and we need to handle it.
+Let's hjt with curl:
 
-Before we do that, let's go ahead and hit it with a request from curl.
+EliezerC@L07705EliezerC MINGW64 ~
+$ curl -s -I http://localhost:8594
 
 
 Starting server....
 TcpListener { addr: V4(127.0.0.1:8594), fd: 3 }
 Server listening for http://localhost:8594
 Got incoming connection request...
-Ok(TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59432), fd: 4 })
-Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59432), fd: 4 }
-Inside handle_client_request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59432), fd: 4 }
-
-
-EliezerC@L07705EliezerC MINGW64 ~
-$ curl -s -I http://localhost:8594
-HTTP/1.1 200 OK
-
+Ok(TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:60089), fd: 4 })
+Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:60089), fd: 4 }
+Inside request handler: TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:60089), fd: 4 }
 
 
 No apparent errors or blow up.
 
-
-
 -----------------------------------------------------------------------------------
-Since we are trying to read the incoming request string, the only thing we're going
-to do with it is print it to our server window.
-
-First, though, let's handle that warning for the Result Ok or Error.
-
- 51     let req_result = stream.read(&mut request);
- 52     match req_result {
- 53         Ok(ok_var) => println!("OK:  {:?}", ok_var),
- 54         Err(err_var) => println!("Err:  {:?}", err_var),
- 55     }
+Now let's print our request array , after doing the 'read()' function.
 
 
-Ok, it ran and no warnings.
-
------------------------------------------------------------------------------------
-Now let's work on displaing the incoming request string to the server window.
-
- 57     println!("Incoming request: {:?}", request);
-
+    println!("Incoming request: {:?}", request);
 
 Starting server....
 TcpListener { addr: V4(127.0.0.1:8594), fd: 3 }
 Server listening for http://localhost:8594
+
+
+EliezerC@L07705EliezerC MINGW64 ~
+$ curl -s -I http://localhost:8594
+
+
+
 Got incoming connection request...
-Ok(TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59537), fd: 4 })
-Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59537), fd: 4 }
-Inside handle_client_request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59537), fd: 4 }
-OK:  0
+Ok(TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:60767), fd: 4 })
+Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:60767), fd: 4 }
+Inside request handler: TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:60767), fd: 4 }
 Incoming request: []
-After handle Ok:  20
+     
 
 
 So it didnt blow , just didn't capture anything - since we declared an empty array.
@@ -189,66 +371,55 @@ What if we give the array some size?
 
  49     let mut request = [0;5];
  50     println!("New request array : {:?}", request);
- 51
- 52     let req_result = stream.read(&mut request);
- 53     match req_result {
- 54         Ok(ok_var) => println!("OK:  {:?}", ok_var),
- 55         Err(err_var) => println!("Err:  {:?}", err_var),
- 56     }
- 57
+ 52     stream.read(&mut request);
  58     println!("Incoming request: {:?}", request);
  
 
 
-Starting server....
-TcpListener { addr: V4(127.0.0.1:8594), fd: 3 }
-Server listening for http://localhost:8594
 Got incoming connection request...
-Ok(TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59607), fd: 4 })
-Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59607), fd: 4 }
-Inside handle_client_request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59607), fd: 4 }
-New request array : [0, 0, 0, 0, 0]
-OK:  5
-Incoming request: [72, 69, 65, 68, 32]
-After handle Ok:  20
+Ok(TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:60802), fd: 4 })
+Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:60802), fd: 4 }
+Inside request handler: TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:60802), fd: 4 }
+incoming request: [0, 0, 0, 0, 0]
+incoming request: [72, 69, 65, 68, 32]
 
 
 -----------------------------------------------------------------------------------
-The compiler seems to have inferred the type of array based on the initialization.
+We want to convert that array of numbers into something meangingful.
+There are probably much better ways to do this, but i chose to just tack on a method
+that may not exist, but the error gives me some information.
 
-Seems like we have some bytes.  We want to turn that into something meaningful.
-
-There are probably way better ways to do this, but one way I found is to attempt
-a method that may not exist, and we then get the type from the compiler.
-
-like so:
-
- 58     println!("Incoming request: {:?}", request);
- 59
- 60     println!("Incoming request: {:?}", request.unwrap());
- 
+ 60     let mut request = [0;5];
+ 61     println!("incoming request: {:?}", request);
+ 62     let _result = stream.read(&mut request);
+ 63     println!("incoming request: {:?}", request);
+ 64     println!("incoming request: {:?}", request.unwrap());
 
 error[E0599]: no method named `unwrap` found for type `[u8; 5]` in the current scope
-  --> src/main.rs:60:48
+  --> src/main.rs:64:48
    |
-60 |     println!("Incoming request: {:?}", request.unwrap());
-   |                                                ^^^^^^ method not found in `[u8; 5]`
+64 |     println!("incoming request: {:?}", request.unwrap());
+   |                                                ^^^^^^ method not found in `[u8; 5]
 
-
-So now we know that we have a byte array .   8-bit bytes.  Not integer array.
+This error tells me that request array is of type bytes (U8).
 
 
 -----------------------------------------------------------------------------------
-Let's try converting the byte array into a string or somethjng like that.
+How abouut if we try to convert the byte array to a string or something like that?
 
-After some researching:
+So I found this:
 
- 60     let btyes_to_string = std::str::from_utf8(request);
+ 60     let mut request = [0;5];
+ 61     println!("incoming request: {:?}", request);
+ 62     let _result = stream.read(&mut request);
+ 63     println!("incoming request: {:?}", request);
+ 64     println!("incoming request: {:?}", request);
+ 65     let bytes_to_string = std::str::from_utf8(request);
 
 error[E0308]: mismatched types
-  --> src/main.rs:60:47
+  --> src/main.rs:65:47
    |
-60 |     let btyes_to_string = std::str::from_utf8(request);
+65 |     let bytes_to_string = std::str::from_utf8(request);
    |                                               ^^^^^^^
    |                                               |
    |                                               expected `&[u8]`, found array `[u8; 5]`
@@ -256,64 +427,53 @@ error[E0308]: mismatched types
 
 
 -----------------------------------------------------------------------------------
- 60     let btyes_to_string = std::str::from_utf8(&request);
 
-warning: unused variable: `btyes_to_string`
-  --> src/main.rs:60:9
-   |
-60 |     let btyes_to_string = std::str::from_utf8(&request);
-   |         ^^^^^^^^^^^^^^^ help: consider prefixing with an underscore: `_btyes_to_string`
-   |
-   = note: `#[warn(unused_variables)]` on by default
+ 65     let bytes_to_string = std::str::from_utf8(&request);
+ 66     println!("incoming request: {:?}", bytes_to_string);
 
------------------------------------------------------------------------------------
-no warnings.  let's print that new string:
-
- 58     println!("Incoming request bytes: {:?}", request);
- 59
- 60     let _btyes_to_string = std::str::from_utf8(&request);
- 61
- 62     println!("Incoming request string: {:?}", _bytes_to_string);
- 
 
 Starting server....
 TcpListener { addr: V4(127.0.0.1:8594), fd: 3 }
 Server listening for http://localhost:8594
 Got incoming connection request...
-Ok(TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59861), fd: 4 })
-Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59861), fd: 4 }
-Inside handle_client_request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:59861), fd: 4 }
-New request array : [0, 0, 0, 0, 0]
-OK:  5
-Incoming request bytes: [72, 69, 65, 68, 32]
-Incoming request string: Ok("HEAD ")
-After handle Ok:  20
+Ok(TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:61031), fd: 4 })
+Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:61031), fd: 4 }
+Inside request handler: TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:61031), fd: 4 }
+incoming request: [0, 0, 0, 0, 0]
+incoming request: [72, 69, 65, 68, 32]
+incoming request: [72, 69, 65, 68, 32]
+incoming request: Ok("HEAD ")
 
 
-Ok, we got back a   "OK("HEAD ")".   Interesting. Even though we are printing a string(?) ,
+
+Interesting we got back a   "OK("HEAD ")".   Interesting. Even though we are printing a string(?) ,
 it's an "OK()" wrapping a string.
 
 
 -----------------------------------------------------------------------------------
 So, let's try UNwrapping that Ok().
 
- 58     println!("Incoming request bytes: {:?}", request);
- 59
- 60     let _bytes_to_string = std::str::from_utf8(&request);
- 61
- 62     println!("Incoming request string: {:?}", _bytes_to_string);
- 63
- 64     let _unwrapped_string = _bytes_to_string.unwrap();
- 65
- 66     println!("Incoming request string: {:?}", _unwrapped_string);
 
+ 60     let mut request = [0;5];
+ 61     println!("incoming request: {:?}", request);
+ 62     let _result = stream.read(&mut request);
+ 63     println!("incoming request: {:?}", request);
+ 64     let bytes_to_string = std::str::from_utf8(&request);
+ 65     println!("incoming request: {:?}", bytes_to_string);
+ 66     println!("incoming request unwrapped: {:?}", bytes_to_string.unwrap());
+ 67
 
-New request array : [0, 0, 0, 0, 0]
-OK:  5
-Incoming request bytes: [72, 69, 65, 68, 32]
-Incoming request string: Ok("HEAD ")
-Incoming request string: "HEAD "
-After handle Ok:  20
+Starting server....
+TcpListener { addr: V4(127.0.0.1:8594), fd: 3 }
+Server listening for http://localhost:8594
+Got incoming connection request...
+Ok(TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:61064), fd: 4 })
+Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:61064), fd: 4 }
+Inside request handler: TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:61064), fd: 4 }
+incoming request: [0, 0, 0, 0, 0]
+incoming request: [72, 69, 65, 68, 32]
+incoming request: Ok("HEAD ")
+incoming request unwrapped: "HEAD "
 
 
 And we get the "HEAD" portion of the request by itself.  Pretty cool.
@@ -337,7 +497,9 @@ error[E0277]: arrays only have std trait implementations for lengths 0..=32
 
 
 -----------------------------------------------------------------------------------
-As it turns out, unless we more into Rust, we are limited to a size of 32.
+As it turns out, unless we implement something, we are limited to a size of 32.
+Although I think I did read that this limit has already been worked on, just not part
+of the stable Rust release as of this date.
 
  49     let mut request = [0;32];
 
@@ -356,9 +518,52 @@ Seems the size 32 was just enough to grab most of the incoming HTTP request.
 
 
 -----------------------------------------------------------------------------------
+Ok..moving on.   So even though I have referred to this program as an HTTP server,
+it's really not, is it?  For at least two reasons.
 
-Anyway... we shall leave things here.
+a) there would be work to be done to get it to parse urls requesting pages or resources, and handling headers and dresponse types
 
-Next time we shall move onto something new, but related.
+b) there is nothing in the code to limit NON HTTP data requests.
+
+So, really, it's a TCP server.   I don't really want to turn it into an HTTP server at this time;
+there are higher-level libraries available that will do that for us, and that is the subject
+for another video for another time.
+
+But let's play  a bit more with receiving data.
+
+We have seen how it behaves when the incoming stream is at least 32 bytes.
+
+What if the incoming data is less than that?
+
+So next we get away from curl as our client, and we use 'telnet'.
+
+
+EliezerC@L07705EliezerC ~
+$ telnet localhost 8594
+Trying ::1...
+Connection failed: Connection refused
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is '^]'.
+
+
+Got incoming connection request...
+Ok(TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:61627), fd: 4 })
+Handling request....TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:61627), fd: 4 }
+Inside request handler: TcpStream { addr: V4(127.0.0.1:8594), peer: V4(127.0.0.1:61627), fd: 4 }
+incoming request: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+asdf
+Connection closed by foreign host.
+
+
+incoming request: [97, 115, 100, 102, 13, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+incoming request: Ok("asdf\r\n\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}")
+incoming request unwrapped: "asdf\r\n\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}"
+                                                                
+
+It sort of works. Our telnet client expected some initial telnet protocol.
+
+Anyway.... that's it for now... I don't really feel like making this server more robust for now, like handling lots of data, or multiple clients simulatenously.
 
 
