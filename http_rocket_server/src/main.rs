@@ -1,12 +1,13 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 
-#[macro_use]
-extern crate lazy_static;
+//#[macro_use]
+//extern crate lazy_static;
 
 use rocket::*;
 use std::thread;
 use std::time::Duration;
 use std::sync::Mutex;
+use lazy_static::lazy_static;
 
 lazy_static! {
     static ref VALUE:Mutex<u8> = Mutex::new(0);
