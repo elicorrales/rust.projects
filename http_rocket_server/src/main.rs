@@ -26,11 +26,11 @@ fn post_value(val:u8) -> String {
         let val2 = *v;
         println!("client 1 is releasing lock");
         if val != val2 {
-            return format!("ERROR");
+            return format!("E");
         }
 
         println!("");
-        format!("OK")
+        format!(".")
     }
 }
 
