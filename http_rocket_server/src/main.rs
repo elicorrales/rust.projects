@@ -1,8 +1,5 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 
-//#[macro_use]
-//extern crate lazy_static;
-
 use rocket::*;
 use std::thread;
 use std::time::Duration;
