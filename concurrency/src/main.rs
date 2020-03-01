@@ -1,42 +1,44 @@
 mod book;
 use book::*;
-
+use std::collections::HashMap;
+use rand::*;
 
 fn main() {
 
-    let mut cache:Vec<&Book> = Vec::new();
+    let mut cache:HashMap<u32,&Book> = HashMap::new();
 
-    query_cache(&cache);
+    let mut rng = thread_rng();
 
-    query_database(&mut cache);
+    for i in 1..30 {
 
-    query_cache(&cache);
+        let id = rng.gen_range(1,21);
+
+        query_cache(&cache,id);
+
+        query_database(&mut cache,id);
+    }
+
+
 }
 
-fn query_cache(cache:&Vec<&Book>) {
+fn query_cache(cache:&HashMap<u32,&Book>,rndid:u32) {
 
-    println!("|Query Cache----------------------------------|");
-    println!("|                                             |");
-
-    for book in cache {
-        println!("| {} {}", book.id, book.author);
+    let option = cache.get(&rndid);
+    match option {
+        Some(book) => { println!("id: {} len:{} ", rndid, cache.len()); }
+        None       => println!("no book")
     }
-    println!("|                                             |");
     println!("-----------------------------------------------");
 }
 
 
-fn query_database(cache:&mut Vec<&Book>) {
-
-    println!("Query Database-------------------------------");
-    println!("|                                             |");
+fn query_database(cache:&mut HashMap<u32,&Book>,rndid:u32) {
 
     for i in 0..20 {
         let id = BOOKS[i].id;
-        let author = BOOKS[i].author;
-        println!("| {} {}", id, author);
-        cache.push(&BOOKS[i]);
+        if id == rndid {
+            let author = BOOKS[i].author;
+            cache.insert(id,&BOOKS[i]);
+        }
     }
-    println!("|                                             |");
-    println!("-----------------------------------------------");
 }
