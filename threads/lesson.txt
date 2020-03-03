@@ -107,13 +107,13 @@ variable and use variable to pass to thread
   4
   5 fn main() {
   6
-  7     let my_thread1 = ||{
+  7     let my_thread1_func = ||{
   8         sleep(Duration::from_millis(1000));
   9         println!("Thread 1");
  10         println!("");
  11     };
  12
- 13     let my_thread2 = ||{
+ 13     let my_thread2_func = ||{
  14         sleep(Duration::from_millis(500));
  15         println!("Thread 2");
  16         println!("");
@@ -122,8 +122,8 @@ variable and use variable to pass to thread
  19     println!("");
  20     println!("Main thread starts other threads..");
  21
- 22     spawn(my_thread1);
- 23     spawn(my_thread2);
+ 22     spawn(my_thread1_func);
+ 23     spawn(my_thread2_func);
  24
  25
  26     println!("");
@@ -138,6 +138,8 @@ variable and use variable to pass to thread
 ---------------------------------------------------------------------
 --forget threads, show how closures can be called directly
 --and show use of closure parameter
+-- BUT we're NOT calling them in threads
+--  more on that later
 
 
   1 use std::thread::spawn;
@@ -146,25 +148,21 @@ variable and use variable to pass to thread
   4
   5 fn main() {
   6
-  7     let my_thread1 = |num|{
+  7     let my_thread1_func = |num|{
   8         sleep(Duration::from_millis(1000));
   9         println!("Thread 1");
  10         println!("");
  11     };
  12
- 13     let my_thread2 = |num|{
+ 13     let my_thread2_func = |num|{
  14         sleep(Duration::from_millis(500));
  15         println!("Thread {}");
  16         println!("");
  17     };
  18
- 19     println!("");
- 20     println!("Main thread starts other threads..");
  21
- 22     my_thread1(1);
- 23     my_thread2(2);
- 24     //spawn(my_thread1(1));
- 25     //spawn(my_thread2(2));
+ 22     my_thread1_func(1);
+ 23     my_thread2_func(2);
  26
  27
  28     println!("");
@@ -188,7 +186,7 @@ variable and use variable to pass to thread
   4
   5 fn main() {
   6
-  7     let my_thread = |num|{
+  7     let my_thread_func = |num|{
   8         sleep(Duration::from_millis(1000));
   9         println!("Thread {}", num);
  10         println!("");
@@ -197,10 +195,8 @@ variable and use variable to pass to thread
  13     println!("");
  14     println!("Main thread starts other threads..");
  15
- 16     my_thread(1);
- 17     my_thread(2);
- 18     //spawn(my_thread1(1));
- 19     //spawn(my_thread2(2));
+ 16     my_thread_func(1);
+ 17     my_thread_func(2);
  20
  21
  22     println!("");
@@ -211,8 +207,102 @@ variable and use variable to pass to thread
  27     println!("Main thread done.");
  28 }
 
+---------------------------------------------------------------------
+-- show use of closure (anonymous func) able to use extern variable
+BUT no threadings.
+
+use std::thread::spawn;
+use std::thread::sleep;
+use std::time::Duration;
+
+fn main() {
+
+    let some_extern_var = 10;
+
+    let my_thread_using_extern_vars = ||{
+        sleep(Duration::from_millis(500));
+        println!("Thread using extern");
+        println!("{}", some_extern_var);
+        println!("");
+    };
+
+ 
+    //run as normal function
+    my_thread_using_extern_vars();
 
 
+    println!("");
+    println!("Main thread waiting...");
+    println!("");
+    sleep(Duration::from_millis(1200));
+    println!("");
+    println!("Main thread done.");
+}
 
-~
 
+---------------------------------------------------------------------
+-- show use of variable external to closure(thread) but within main
+ func, and that we have to "move" ownership
+IF we want to run a thread
+
+use std::thread::spawn;
+use std::thread::sleep;
+use std::time::Duration;
+
+fn main() {
+
+    let some_extern_var = 10;
+
+    let my_thread_using_extern_vars = move ||{
+        sleep(Duration::from_millis(500));
+        println!("Thread using extern");
+        println!("{}", some_extern_var);
+        println!("");
+    };
+
+ 
+    println!("");
+    println!("Main thread starts other threads..");
+
+    spawn(my_thread_using_extern_vars);
+
+
+    println!("");
+    println!("Main thread waiting...");
+    println!("");
+    sleep(Duration::from_millis(1200));
+    println!("");
+    println!("Main thread done.");
+}
+
+
+---------------------------------------------------------------------
+-- if we move the variable from main() into global, we dont 
+need a 'move'
+
+use std::thread::spawn;
+use std::thread::sleep;
+use std::time::Duration;
+
+static some_extern_var:u32 = 10;
+
+fn main() {
+
+    let my_thread_using_extern_vars = ||{
+        sleep(Duration::from_millis(500));
+        println!("Thread using extern");
+        println!("{}", some_extern_var);
+        println!("");
+    };
+
+ 
+    spawn(my_thread_using_extern_vars);
+
+
+    println!("");
+    println!("Main thread waiting...");
+    println!("");
+    sleep(Duration::from_millis(1200));
+    println!("");
+    println!("Main thread done.");
+}
