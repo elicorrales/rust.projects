@@ -306,3 +306,174 @@ fn main() {
     println!("");
     println!("Main thread done.");
 }
+
+
+
+---------------------------------------------------------------------
+-- global is easier?
+-- example using unsafe code
+
+
+use std::thread::spawn;
+use std::thread::sleep;
+use std::time::Duration;
+
+static mut SOME_EXTERN_VAR:u32 = 10;
+
+fn main() {
+
+    let my_thread_using_extern_vars = ||{
+        sleep(Duration::from_millis(500));
+        println!("Thread using extern");
+        unsafe {
+            println!("in thread: {:?}", SOME_EXTERN_VAR);
+            SOME_EXTERN_VAR = 11;
+        }
+        println!("");
+    };
+
+ 
+    spawn(my_thread_using_extern_vars);
+
+    unsafe {
+        println!("In main: {}", SOME_EXTERN_VAR);
+    }
+
+
+    sleep(Duration::from_millis(1200));
+    unsafe {
+        println!("In main: {}", SOME_EXTERN_VAR);
+    }
+
+    println!("");
+    println!("Main thread waiting...");
+    println!("");
+    sleep(Duration::from_millis(1200));
+    println!("");
+    println!("Main thread done.");
+}
+
+
+
+---------------------------------------------------------------------
+use std::thread::spawn;
+use std::thread::sleep;
+use std::time::Duration;
+use lazy_static::lazy_static;
+use std::sync::Mutex;
+
+
+lazy_static! {
+    static ref SOME_EXTERN_VAR:Mutex<u32> = Mutex::new(10);
+}
+
+
+fn main() {
+
+    let my_thread_using_extern_vars = ||{
+        sleep(Duration::from_millis(500));
+        println!("Thread using extern");
+        println!("in thread: {:?}", SOME_EXTERN_VAR.lock().unwrap());
+        //SOME_EXTERN_VAR = 11;
+        println!("");
+    };
+
+ 
+    spawn(my_thread_using_extern_vars);
+
+    //println!("In main: {}", SOME_EXTERN_VAR);
+
+    sleep(Duration::from_millis(1200));
+
+    //println!("In main: {}", SOME_EXTERN_VAR);
+
+    println!("");
+    println!("Main thread waiting...");
+    println!("");
+    sleep(Duration::from_millis(1200));
+    println!("");
+    println!("Main thread done.");
+}
+
+---------------------------------------------------------------------
+
+use std::thread::spawn;
+use std::thread::sleep;
+use std::time::Duration;
+use lazy_static::lazy_static;
+use std::sync::Mutex;
+
+
+lazy_static! {
+    static ref SOME_EXTERN_VAR:Mutex<u32> = Mutex::new(10);
+}
+
+
+fn main() {
+
+    let my_thread_using_extern_vars = ||{
+        sleep(Duration::from_millis(500));
+        println!("Thread using extern");
+        println!("in thread: {:?}", SOME_EXTERN_VAR.lock().unwrap());
+        let mut ext = SOME_EXTERN_VAR.lock().unwrap();
+        println!("in thread: {:?}", ext);
+        *ext = 11;
+        println!("in thread: {:?}", ext);
+        println!("");
+    };
+
+ 
+    spawn(my_thread_using_extern_vars);
+
+    //this insures that thread grabs extern first and modifies it.
+    //if this line is commented, main might grab ext first 
+    //sleep(Duration::from_millis(1200));
+
+    let mut ext = SOME_EXTERN_VAR.lock().unwrap();
+    println!("In main: {}", ext);
+
+    sleep(Duration::from_millis(1200));
+
+    println!("In main: {}", ext);
+
+    println!("");
+    println!("Main thread waiting...");
+    println!("");
+    sleep(Duration::from_millis(1200));
+    println!("");
+    println!("Main thread done.");
+}
+
+
+myuser@L07705EliezerC:~/projects/rust/threads$ cargo run
+   Compiling threads v0.1.0 (/home/myuser/projects/rust/threads)
+    Finished dev [unoptimized + debuginfo] target(s) in 1.99s
+     Running `target/debug/threads`
+In main: 10
+Thread using extern
+In main: 10
+
+Main thread waiting...
+
+
+Main thread done.
+thread 'myuser@L07705EliezerC:~/projects/rust/threads$ cargo run
+   Compiling threads v0.1.0 (/home/myuser/projects/rust/threads)
+    Finished dev [unoptimized + debuginfo] target(s) in 2.02s
+     Running `target/debug/threads`
+Thread using extern
+in thread: 10
+in thread: 10
+in thread: 11
+
+In main: 11
+In main: 11
+
+Main thread waiting...
+
+
+Main thread done.
+
+
+
+

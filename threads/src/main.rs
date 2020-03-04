@@ -1,36 +1,41 @@
 use std::thread::spawn;
 use std::thread::sleep;
 use std::time::Duration;
+use lazy_static::lazy_static;
+use std::sync::Mutex;
 
-static mut some_extern_var:u32 = 10;
+
+lazy_static! {
+    static ref SOME_EXTERN_VAR:Mutex<u32> = Mutex::new(10);
+}
+
 
 fn main() {
 
-    //let mut some_extern_var:u32 = 10;
-    //let ref_to_ext_var = &some_extern_var;
-
-    let my_thread_using_extern_vars = move ||{
-        unsafe {
+    let my_thread_using_extern_vars = ||{
         sleep(Duration::from_millis(500));
         println!("Thread using extern");
-        println!("in thread: {}", some_extern_var);
-        //println!("in thread: {}", ref_to_ext_var);
+        println!("in thread: {:?}", SOME_EXTERN_VAR.lock().unwrap());
+        let mut ext = SOME_EXTERN_VAR.lock().unwrap();
+        println!("in thread: {:?}", ext);
+        *ext = 11;
+        println!("in thread: {:?}", ext);
         println!("");
-        some_extern_var = 11;
-        }
     };
 
  
     spawn(my_thread_using_extern_vars);
 
-    unsafe {
-    println!("In main: {}", some_extern_var);
-    }
+    //this insures that thread grabs extern first and modifies it.
+    //if this line is commented, main might grab ext first 
+    sleep(Duration::from_millis(1200));
+
+    let ext = SOME_EXTERN_VAR.lock().unwrap();
+    println!("In main: {}", ext);
 
     sleep(Duration::from_millis(1200));
-    unsafe {
-    println!("In main: {}", some_extern_var);
-    }
+
+    println!("In main: {}", ext);
 
     println!("");
     println!("Main thread waiting...");
@@ -39,3 +44,4 @@ fn main() {
     println!("");
     println!("Main thread done.");
 }
+
