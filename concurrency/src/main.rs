@@ -10,56 +10,58 @@ use std::process::exit;
 use std::str::FromStr;
 
 fn main() {
+    let mut num_loops = 30;
+    let mut delay_ms  = 100;
 
-    let args : Vec<String> = args().collect();
+    let args:Vec<String> = args().collect();
 
-    let mut num_loops:u32 = 0;
+    match args.len() {
 
-    handle_cmdline_args(&args, &mut num_loops);
+        2         => {
+                        let result = <u32 as FromStr>::from_str(&args[1]);
+                        if result.is_ok() {
+                            num_loops = result.unwrap();
+                        }
+                    }
+
+        3         => {
+                        let result = <u32 as FromStr>::from_str(&args[1]);
+                        if result.is_ok() {
+                            num_loops = result.unwrap();
+                        }
+                        let result2 = <u32 as FromStr>::from_str(&args[2]);
+                        if result2.is_ok() {
+                            delay_ms = result2.unwrap().into();
+                        }
+                    }
+
+        4|5|6|7|8 => { println!("Not Implemented."); usage(&args[0]); }
+
+        _         => usage(&args[0])
+
+    }
 
     let mut cache:HashMap<u32,&Book> = HashMap::new();
 
     let mut rng = thread_rng();
 
-    for _i in 1..30 {
+    for _i in 1..num_loops {
 
         let id = rng.gen_range(1,21);
 
         query_cache(&cache,id);
 
-        query_database(&mut cache,id);
+        query_database(&mut cache,id, delay_ms);
     }
 
     println!("");
 
 }
 
-fn handle_cmdline_args(args:&Vec<String>, num_loops:&mut u32) {
-
-    println!("{}", args.len());
-
-    match args.len() {
-        2 => { 
-
-            println!("{}",args[1]);
-            let result = FromStr::from_str(&args[1]);
-            match result {
-                Ok(loops) => {
-                    let l:u32 = loops;
-                    println!("{}", l);
-                }
-                Err(myerr)=> println!("{:?}", myerr)
-            }
-
-        }
-        _ => usage(args)
-    }
-}
-
-fn usage(args:&Vec<String>) {
+fn usage(prog_name:&String) {
     println!("");
     println!("");
-    println!("{} <num loops>", args[0]);
+    println!("usage: {} <num_loops> <delay_ms>", prog_name);
     println!("");
     println!("");
     exit(1);
@@ -68,20 +70,20 @@ fn usage(args:&Vec<String>) {
 fn query_cache(cache:&HashMap<u32,&Book>,rndid:u32) {
 
     print!(".");
+
     let option = cache.get(&rndid);
     match option {
-        //Some(book) => { print!("{} ", cache.len()); }
-        None       => {/* do nothing */} 
-        _          => { print!("{} ", cache.len()); }
+        Some(_) => print!("{}", cache.len()),
+        None    => {/*print!(".")*/}
     }
+
+    std::io::stdout().flush().unwrap();
 }
 
 
-fn query_database(cache:&mut HashMap<u32,&Book>,rndid:u32) {
+fn query_database(cache:&mut HashMap<u32,&Book>, rndid:u32, delay_ms:u64) {
 
-    //mimic delay hitting database...
-    thread::sleep(Duration::from_millis(100));
-    std::io::stdout().flush().unwrap();
+    thread::sleep(Duration::from_millis(delay_ms));
     for i in 0..20 {
         let id = BOOKS[i].id;
         if id == rndid {
@@ -89,3 +91,11 @@ fn query_database(cache:&mut HashMap<u32,&Book>,rndid:u32) {
         }
     }
 }
+
+/*
+use std::thread;
+use std::time::Duration;
+use std::io::Write;
+    thread::sleep(Duration::from_millis(100));
+    //mimic delay hitting database...
+*/
