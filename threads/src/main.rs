@@ -1,55 +1,27 @@
-use std::thread::spawn;
 use std::thread::sleep;
+use std::thread::spawn;
 use std::time::Duration;
-use std::io::Write;
-
-
-static mut SOME_EXTERN_VAR:u32 = 0;
-
 
 fn main() {
 
-    let my_thread_1 = |val|{
-        //print!("1 ");
-        unsafe {
-            SOME_EXTERN_VAR = 11;
-        }
-        sleep(Duration::from_millis(500));
-        unsafe {
-            if SOME_EXTERN_VAR != 11 {
-                //print!("E1 ");
-            } 
-        }
-        std::io::stdout().flush().unwrap();
+    let task1 = || {
+        sleep(Duration::from_millis(200));
+        println!("Task 1 is done.");
     };
 
-    let my_thread_2 = |val|{
-        //print!("2 ");
-        unsafe {
-            SOME_EXTERN_VAR = 22;
-        }
-        sleep(Duration::from_millis(500));
-        unsafe {
-            if SOME_EXTERN_VAR != 22 {
-                //print!("E2 ");
-            }
-        }
-        std::io::stdout().flush().unwrap();
+    let task2 = || {
+        sleep(Duration::from_millis(200));
+        println!("Task 2 is done.");
     };
 
+    println!("Main is starting....");
 
-    for i in 0..40 {
-        sleep(Duration::from_millis(80));
-        spawn(my_thread_1(11));
-        spawn(my_thread_2(22));
-    }
+    spawn(task1);
+    spawn(task2);
 
+    println!("Main is waiting....");
 
-    println!("");
-    println!("Main thread waiting...");
-    println!("");
-    sleep(Duration::from_millis(1200));
-    println!("");
-    println!("Main thread done.");
+    sleep(Duration::from_millis(500));
+
+    println!("Main is done");
 }
-
