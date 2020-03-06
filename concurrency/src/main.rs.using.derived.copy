@@ -12,16 +12,14 @@ use lazy_static::lazy_static;
 use std::sync::Mutex;
 
 lazy_static! {
-
+    //static ref CACHE:Mutex<HashMap<u32,BookCopy>> = Mutex::new(HashMap::new());
     static ref CACHE:Mutex<HashMap<u32,Book>> = Mutex::new(HashMap::new());
-    static ref NUM_BOOKS:Mutex<u32> = Mutex::new(0);
-    static ref DELAY_MS:Mutex<u64> = Mutex::new(0);
 }
-
 
 fn main() {
 
 
+    //let (num_loops, delay_ms) = handle_cmdline_args();
     let (num_books, num_loops, delay_ms, is_random) = handle_cmdline_args();
 
 
@@ -31,9 +29,9 @@ fn main() {
     for _i in 1..num_loops {
 
         if is_random {
-            id = rng.gen_range(1,num_books+1);
+            id = rng.gen_range(1,num_books);
         } else {
-            if id > num_books {
+            if id >= num_books {
                 id = 0;
             } else {
                 id += 1;
@@ -53,9 +51,9 @@ fn main() {
 
 fn handle_cmdline_args() -> (u32, u32, u64, bool) {
 
-    let mut num_books = 5;
-    let mut num_loops = 10;
-    let mut delay_ms  = 1;
+    let mut num_books = 21;
+    let mut num_loops = 30;
+    let mut delay_ms  = 100;
     let mut is_random = true;
 
     let args:Vec<String> = args().collect();
@@ -75,66 +73,63 @@ fn handle_cmdline_args() -> (u32, u32, u64, bool) {
                         let result = <u32 as FromStr>::from_str(&args[1]);
                         if result.is_ok() {
                             num_books = result.unwrap();
-                        } else { usage(); }
+                        }
                         let result = <u32 as FromStr>::from_str(&args[2]);
                         if result.is_ok() {
                             num_loops = result.unwrap();
-                        } else { usage(); }
+                        }
                     }
 
         4         => {
                         let result = <u32 as FromStr>::from_str(&args[1]);
                         if result.is_ok() {
                             num_books = result.unwrap();
-                        } else { usage(); }
+                        }
                         let result = <u32 as FromStr>::from_str(&args[2]);
                         if result.is_ok() {
                             num_loops = result.unwrap();
-                        } else { usage(); }
+                        }
 
                         let result2 = <u64 as FromStr>::from_str(&args[3]);
                         if result2.is_ok() {
                             delay_ms = result2.unwrap();
-                        } else { usage(); }
+                        }
                     }
 
         5         => {
                         let result = <u32 as FromStr>::from_str(&args[1]);
                         if result.is_ok() {
                             num_books = result.unwrap();
-                        } else { usage(); }
+                        }
                         let result = <u32 as FromStr>::from_str(&args[2]);
                         if result.is_ok() {
                             num_loops = result.unwrap();
-                        } else { usage(); }
+                        }
 
                         let result2 = <u64 as FromStr>::from_str(&args[3]);
                         if result2.is_ok() {
                             delay_ms = result2.unwrap();
-                        } else { usage(); }
+                        }
 
 
                         if &args[4] == "n" {
                             is_random = false;
                         }
                     }
-        _         => usage()
+        _         => usage(&args[0])
 
     }
 
-    *NUM_BOOKS.lock().unwrap() = num_books;
-    *DELAY_MS.lock().unwrap()  = delay_ms;
 
     (num_books, num_loops, delay_ms, is_random)
 }
 
 
 
-fn usage() {
-    let args:Vec<String> = args().collect();
+fn usage(prog_name:&String) {
     println!("");
     println!("");
-    println!("usage: {} <num_books, <num_loops> <delay_ms> <is_random>", &args[0]);
+    println!("usage: {} <num_books, <num_loops> <delay_ms> <is_random>", prog_name);
     println!("");
     println!("");
     exit(1);
@@ -157,11 +152,10 @@ fn query_cache(rndid:u32) {
 
 
 
-fn query_database(num_books:usize, rndid:u32, delay_ms:u64) {
+fn query_database(num_loops:usize, rndid:u32, delay_ms:u64) {
 
     thread::sleep(Duration::from_millis(delay_ms));
-    for i in 1..=num_books {
-        println!("num_books {} rndid:{}", num_books, rndid);
+    for i in 0..num_loops {
         let id = BOOKS[i].id;
         if id == rndid {
             //let book = &BOOKS[i];

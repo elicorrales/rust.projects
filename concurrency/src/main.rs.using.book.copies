@@ -18,18 +18,28 @@ lazy_static! {
 fn main() {
 
 
-    let (num_loops, delay_ms) = handle_cmdline_args();
+    //let (num_loops, delay_ms) = handle_cmdline_args();
+    let (num_books, num_loops, delay_ms, is_random) = handle_cmdline_args();
 
 
     let mut rng = thread_rng();
 
+    let mut id = 0;
     for _i in 1..num_loops {
 
-        let id = rng.gen_range(1,21);
+        if is_random {
+            id = rng.gen_range(1,num_books);
+        } else {
+            if id >= num_books {
+                id = 0;
+            } else {
+                id += 1;
+            }
+        }
 
         query_cache(id);
 
-        query_database(id, delay_ms);
+        query_database(num_books as usize, id, delay_ms);
     }
 
     println!("");
@@ -37,10 +47,13 @@ fn main() {
 }
 
 
-fn handle_cmdline_args() -> (u32, u64) {
 
+fn handle_cmdline_args() -> (u32, u32, u64, bool) {
+
+    let mut num_books = 21;
     let mut num_loops = 30;
     let mut delay_ms  = 100;
+    let mut is_random = true;
 
     let args:Vec<String> = args().collect();
 
@@ -51,40 +64,79 @@ fn handle_cmdline_args() -> (u32, u64) {
         2         => {
                         let result = <u32 as FromStr>::from_str(&args[1]);
                         if result.is_ok() {
-                            num_loops = result.unwrap();
+                            num_books = result.unwrap();
                         }
                     }
 
         3         => {
                         let result = <u32 as FromStr>::from_str(&args[1]);
                         if result.is_ok() {
+                            num_books = result.unwrap();
+                        }
+                        let result = <u32 as FromStr>::from_str(&args[2]);
+                        if result.is_ok() {
                             num_loops = result.unwrap();
                         }
-                        let result2 = <u64 as FromStr>::from_str(&args[2]);
+                    }
+
+        4         => {
+                        let result = <u32 as FromStr>::from_str(&args[1]);
+                        if result.is_ok() {
+                            num_books = result.unwrap();
+                        }
+                        let result = <u32 as FromStr>::from_str(&args[2]);
+                        if result.is_ok() {
+                            num_loops = result.unwrap();
+                        }
+
+                        let result2 = <u64 as FromStr>::from_str(&args[3]);
                         if result2.is_ok() {
                             delay_ms = result2.unwrap();
                         }
                     }
 
+        5         => {
+                        let result = <u32 as FromStr>::from_str(&args[1]);
+                        if result.is_ok() {
+                            num_books = result.unwrap();
+                        }
+                        let result = <u32 as FromStr>::from_str(&args[2]);
+                        if result.is_ok() {
+                            num_loops = result.unwrap();
+                        }
+
+                        let result2 = <u64 as FromStr>::from_str(&args[3]);
+                        if result2.is_ok() {
+                            delay_ms = result2.unwrap();
+                        }
+
+
+                        if &args[4] == "n" {
+                            is_random = false;
+                        }
+                    }
         _         => usage(&args[0])
 
     }
 
 
-    (num_loops, delay_ms)
+    (num_books, num_loops, delay_ms, is_random)
 }
-
 
 
 
 fn usage(prog_name:&String) {
     println!("");
     println!("");
-    println!("usage: {} <num_loops> <delay_ms>", prog_name);
+    println!("usage: {} <num_books, <num_loops> <delay_ms> <is_random>", prog_name);
     println!("");
     println!("");
     exit(1);
 }
+
+
+
+
 
 fn query_cache(rndid:u32) {
 
@@ -101,10 +153,10 @@ fn query_cache(rndid:u32) {
 
 
 
-fn query_database(rndid:u32, delay_ms:u64) {
+fn query_database(num_books:usize, rndid:u32, delay_ms:u64) {
 
     thread::sleep(Duration::from_millis(delay_ms));
-    for i in 0..20 {
+    for i in 0..num_books {
         let id = BOOKS[i].id;
         if id == rndid {
             let book = &BOOKS[i];
