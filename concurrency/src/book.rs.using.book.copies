@@ -1,4 +1,3 @@
-
 pub struct BookCopy {
     pub id: u32,
     pub author:String
