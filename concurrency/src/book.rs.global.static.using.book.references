@@ -1,8 +1,14 @@
-
-pub struct BookCopy {
-    pub id: u32,
-    pub author:String
+/*
+pub struct Book {
+    pub id: u32
 }
+
+pub static BOOKS:[Book;1] = [
+    Book { id:1 }
+];
+*/
+
+
 
 pub struct Book {
     pub id: u32,

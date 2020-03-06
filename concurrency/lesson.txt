@@ -126,3 +126,9 @@ lazy_static! {
 
 
 
+
+----------------------------------------------------------------------------
+see main.rs.final.using.book.references.in.cache, plus same name with book.rs
+
+----------------------------------------------------------------------------
+now try to convert to a cache of book copies

@@ -12,7 +12,7 @@ use lazy_static::lazy_static;
 use std::sync::Mutex;
 
 lazy_static! {
-    static ref CACHE:Mutex<HashMap<u32,BookCopy>> = Mutex::new(HashMap::new());
+    static ref CACHE:Mutex<HashMap<u32,&'static Book>> = Mutex::new(HashMap::new());
 }
 
 fn main() {
@@ -100,16 +100,13 @@ fn query_cache(rndid:u32) {
 }
 
 
-
 fn query_database(rndid:u32, delay_ms:u64) {
 
     thread::sleep(Duration::from_millis(delay_ms));
     for i in 0..20 {
         let id = BOOKS[i].id;
         if id == rndid {
-            let book = &BOOKS[i];
-            let book_copy = BookCopy { id : book.id , author : book.author.to_string() };
-            CACHE.lock().unwrap().insert(id, book_copy);
+            CACHE.lock().unwrap().insert(id,&BOOKS[i]);
         }
     }
 }
