@@ -1,0 +1,128 @@
+
+----------------------------------------------------------------------------
+FIRST - one minor loose-end we didn't handle in previous videos.
+Let's clean up main().
+
+-- first, let's move all of the args processing from main(), into its
+own function
+-- create a new func.
+-- the func returns a tuple (num_loops, delay_ms)
+-- move everything from "let args:Vec ...."   through bottom of "match() {}"
+-- add the reutnr
+-- in main, call new func just after creation of hashmap
+-- move the creation/assignment of num loops and delay ms, to catch the
+return from the new func.  any default values would be created in new func
+
+fn main() {
+
+
+    let mut cache:HashMap<u32,&Book> = HashMap::new();
+
+    let (num_loops, delay_ms) = handle_cmdline_args();
+
+    let mut rng = thread_rng();
+
+    for _i in 1..num_loops {
+
+        let id = rng.gen_range(1,21);
+
+        query_cache(&cache,id);
+
+        query_database(&mut cache,id, delay_ms);
+    }
+
+    println!("");
+
+}
+
+fn handle_cmdline_args() -> (u32, u64) {
+
+    let mut num_loops = 30;
+    let mut delay_ms  = 100;
+
+    let args:Vec<String> = args().collect();
+
+    match args.len() {
+
+        1         => { /* do nothing - returns default values */ }
+
+        2         => {
+                        let result = <u32 as FromStr>::from_str(&args[1]);
+                        if result.is_ok() {
+                            num_loops = result.unwrap();
+                        }
+                    }
+
+        3         => {
+                        let result = <u32 as FromStr>::from_str(&args[1]);
+                        if result.is_ok() {
+                            num_loops = result.unwrap();
+                        }
+                        let result2 = <u64 as FromStr>::from_str(&args[2]);
+                        if result2.is_ok() {
+                            delay_ms = result2.unwrap();
+                        }
+                    }
+
+        _         => usage(&args[0])
+
+    }
+
+
+    (num_loops, delay_ms)
+}
+
+
+----------------------------------------------------------------------------
+Next, we will move the HashMap to global scope
+-- move the top "let cache.." to top above main()
+-- change to "static.."
+-- remove param from funcs
+-- add "unsafe{}" blocks
+-- wrap global cache in lazy_static {}
+-- handle 'lifetime'
+
+in main():
+
+        query_cache(id);
+
+        query_database(id, delay_ms);
+
+for each func def:
+
+
+fn query_cache(rndid:u32) {
+
+fn query_database(rndid:u32, delay_ms:u64) {
+
+
+unsafe:
+
+fn query_cache(rndid:u32) {
+
+    print!(".");
+
+    unsafe {
+        let option = cache.get(&rndid);
+        match option {
+            Some(_) => print!("{}", cache.len()),
+            None    => {/*print!(".")*/}
+        }
+    }
+    std::io::stdout().flush().unwrap();
+}
+
+
+            unsafe {
+                cache.insert(id,&BOOKS[i]);
+            }
+
+
+
+
+lazy_static! {
+    static ref cache:HashMap<u32,&Book> = HashMap::new();
+}
+
+
+

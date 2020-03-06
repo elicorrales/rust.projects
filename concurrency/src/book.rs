@@ -1,8 +1,22 @@
-pub struct Book<'a> {
-    pub id: u32,
-    pub author: &'a str
+/*
+pub struct Book {
+    pub id: u32
 }
 
+pub static BOOKS:[Book;1] = [
+    Book { id:1 }
+];
+*/
+
+
+
+pub struct Book {
+    pub id: u32,
+    pub author: &'static str
+}
+
+
+/*
 pub static BOOKS:[Book;20] = [
     Book { id: 1, author: "Name1" },
     Book { id: 2, author: "Name2" },
@@ -26,3 +40,4 @@ pub static BOOKS:[Book;20] = [
     Book { id: 20, author: "Name20" },
 ];
 
+*/
