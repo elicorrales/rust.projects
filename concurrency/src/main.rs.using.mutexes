@@ -10,7 +10,6 @@ use std::process::exit;
 use std::str::FromStr;
 use lazy_static::lazy_static;
 use std::sync::Mutex;
-use std::time::Instant;
 
 lazy_static! {
 
@@ -33,10 +32,7 @@ fn main() {
 
     let mut rng = thread_rng();
 
-    for i in 0..*NUM_LOOPS.lock().unwrap() {
-
-        let since_start = Instant::now();
-
+    for _i in 0..*NUM_LOOPS.lock().unwrap() {
 
         if *IS_RANDOM.lock().unwrap() {
             *ID.lock().unwrap() = rng.gen_range(1,*NUM_BOOKS.lock().unwrap()+1);
@@ -48,17 +44,9 @@ fn main() {
             }
         }
 
-        thread::spawn(|| {
-            println!("thread 1");
-            query_cache(*ID.lock().unwrap());
-        });
+        query_cache(*ID.lock().unwrap());
 
-        thread::spawn(|| {
-            println!("thread 2");
-            query_database(*NUM_BOOKS.lock().unwrap() as usize, *ID.lock().unwrap(), *DELAY_MS.lock().unwrap());
-        });
-
-        println!("loop:{} time: {:.2?} =======================================",i, since_start.elapsed());
+        query_database(*NUM_BOOKS.lock().unwrap() as usize, *ID.lock().unwrap(), *DELAY_MS.lock().unwrap());
     }
 
     println!("");
@@ -159,7 +147,6 @@ fn usage() {
 
 
 
-
 fn query_cache(rndid:u32) {
 
     print!(".");
@@ -192,5 +179,4 @@ fn query_database(num_books:usize, rndid:u32, delay_ms:u64) {
     }
     //println!("");
 }
-
 
