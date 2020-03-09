@@ -140,8 +140,8 @@ fn query_database(num_books:usize, rndid:u32, delay_ms:u64) {
     for i in 0..num_books {
         let id = BOOKS[i].id;
         if id == rndid {
-            //let book = BookCopy { id: BOOKS[i].id, author: BOOKS[i].author.to_string() };
-            CACHE.lock().unwrap().insert(id, BOOKS[i]);
+            let book = Book { id: BOOKS[i].id, author: BOOKS[i].author };
+            CACHE.lock().unwrap().insert(id, book);
             break;
         }
     }
