@@ -27,7 +27,6 @@ fn main() {
     let mut id = 0;
     for _i in 0..num_loops {
 
-
         if do_random {
             id = rng.gen_range(1,num_books+1);
         } else {
@@ -45,7 +44,6 @@ fn main() {
             query_cache(id);
             query_database(num_books as usize, id, delay_ms);
         }
-
 
     }
 
