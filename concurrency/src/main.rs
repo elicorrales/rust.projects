@@ -15,6 +15,7 @@ lazy_static! {
     static ref CACHE:Mutex<HashMap<u32, BookCopy>> = Mutex::new(HashMap::new());
 }
 
+//============================================================================================
 fn main() {
 
     let since_start = Instant::now();
@@ -26,9 +27,6 @@ fn main() {
     let mut id = 0;
     for _i in 0..num_loops {
 
-        if CACHE.lock().unwrap().len() >= BOOKS.len() {
-            exit_when_full(since_start);
-        }
 
         if do_random {
             id = rng.gen_range(1,num_books+1);
@@ -54,18 +52,27 @@ fn main() {
     println!("");
     println!("");
     println!("Main is waiting....");
-    if do_threaded {
-        thread::sleep(Duration::from_millis(1000));
-    } else {
-        thread::sleep(Duration::from_millis((num_loops as u64) * delay_ms));
+    let mut timed_out = false;
+    let since_start_wait_for_cache_full = Instant::now();
+    while CACHE.lock().unwrap().len() < (num_books as usize) {
+        if since_start_wait_for_cache_full.elapsed() > Duration::from_millis(2000) {
+            timed_out = true;
+            break;
+        }
+        thread::sleep(Duration::from_millis(1));
     }
-    println!("Main is DONE, we may not have finished filling cache with all books.");
     println!("");
+    if timed_out {
+        println!("Main timed OUT, we may not have finished filling cache with all books.");
+    } else {
+        println!("Main done, cache full : {} .", CACHE.lock().unwrap().len());
+    }
     println!("Elapsed time: {:.2?}", since_start.elapsed());
     println!("");
 }
 
 
+//============================================================================================
 fn command_line_handler() -> (u32, u32, u64, bool, bool) {
     let mut num_books:u32 = 1;
     let mut num_loops:u32 = 1;
@@ -131,6 +138,7 @@ fn command_line_handler() -> (u32, u32, u64, bool, bool) {
 
 
 
+//============================================================================================
 fn usage() {
     let args:Vec<String> = args().collect();
     println!("");
@@ -142,19 +150,10 @@ fn usage() {
     exit(1);
 }
 
-fn exit_when_full(since_start:Instant) {
-    println!("");
-    println!("");
-    println!("Cache is full, exiting early.");
-    println!("");
-    println!("Elapsed time: {:.2?}", since_start.elapsed());
-    println!("");
-    exit(0);
-}
 
 
 
-
+//============================================================================================
 fn query_cache(rndid:u32) {
 
     print!(".");
@@ -167,10 +166,13 @@ fn query_cache(rndid:u32) {
         None    => {}
     }
     std::io::stdout().flush().unwrap();
+
+
 }
 
 
 
+//============================================================================================
 fn query_database(num_books:usize, rndid:u32, delay_ms:u64) {
     thread::sleep(Duration::from_millis(delay_ms));
     for i in 0..num_books {
