@@ -1,8 +1,4 @@
-pub struct BookCopy {
-    pub id: u32,
-    pub author: String
-}
-
+#[derive(Copy, Clone)]
 pub struct Book {
     pub id: u32,
     pub author: &'static str
