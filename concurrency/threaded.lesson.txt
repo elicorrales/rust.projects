@@ -1,576 +1,74 @@
-----------------------------------------------------------------------------
--let's attempt to create a thread
+We can decide to call exit_when_full() from the query_cache...
+or we can decide to call it from within the main loop before calling anything else.
+
+if we keep running it in multithreaded mode.. we find that some times 
+
+-- it exits from query_cache
+-- it exist from main loop
+-- it exists at end of main without knowing if we filled the cache.
 
 
-fn main() {
+------------------------------------------------------------------------------------
 
-    // ....blah blah..... lots of code here
+let's improve so that main waits more intelligently   AND
 
-    for _i in 0..num_loops {
-
-        // ....blah blah..... lots of code here
-
-        thread::spawn(query_cache(id));
-
-        query_database(num_books as usize, id, delay_ms);
-
-    }
+let's insure it always exits through bottom of main()
 
 
-error[E0277]: expected a `std::ops::FnOnce<()>` closure, found `()`
-   --> src/main.rs:38:23
-    |
-38  |         thread::spawn(query_cache(id));
-    |                       ^^^^^^^^^^^^^^^ expected an `FnOnce<()>` closure, found `()`
-    |
-    = help: the trait `std::ops::FnOnce<()>` is not implemented for `()`
-    = note: wrap the `()` in a closure with no arguments: `|| { /* code */ }
+-- first, we can obviously remove exit code from query_cache because that seems like
+a hidden side effect.
+
+we still have the issue of it's exiting from main loop{} or, from end of main without knowing.
 
 
-----------------------------------------------------------------------------
--- so the function can/should be wrapped in a closure
-
+Next, in main loop(), we remove the check and exit.
 
 fn main() {
 
-    // ....blah blah..... lots of code here
-
     for _i in 0..num_loops {
 
-        // ....blah blah..... lots of code here
-
-        thread::spawn(|| { query_cache(id)); } );
-
-        query_database(num_books as usize, id, delay_ms);
 
     }
 
-
-help: to force the closure to take ownership of `id` (and any other referenced variables), use the `move` keyword
-   |
-38 |         thread::spawn(move || { query_cache(id); } );
-   |                       ^^^^^^^
-
-
-
-----------------------------------------------------------------------------
--- based on above error/help, we take suggestion and add 'move'
-
-fn main() {
-
-    // ....blah blah..... lots of code here
-
-    for _i in 0..num_loops {
-
-        // ....blah blah..... lots of code here
-
-        thread::spawn(move || { query_cache(id)); } );
-
-        query_database(num_books as usize, id, delay_ms);
-
+    while CACHE.lock().unwrap().len() < (num_books as usize) {
+        thread::sleep(Duration::from_millis(1));
     }
-
-
-SUCCESS!
-
-
-----------------------------------------------------------------------------
--- based on above succes, we do same to query_database
-
-fn main() {
-
-    // ....blah blah..... lots of code here
-
-    for _i in 0..num_loops {
-
-        // ....blah blah..... lots of code here
-
-        thread::spawn(move || { query_cache(id)); } );
-
-        thread::spawn(move || { query_database(num_books as usize, id, delay_ms); });
-
-    }
-
-
-SUCCESS!
-
-
-----------------------------------------------------------------------------
-----------------------------------------------------------------------------
-
--- we are essentially done; we now have converted our application to multi-threaded.
-
-
--- I must say, I'm kind of floor at how easy the conversion was.
-It was pretty much as simple as doing it in GO, where we just had to 
-prepend the function call with "go" and that ran it as a goroutine.
-
--- now let's try to get a feel for what we have done, and also make some
-minor tweasks along the way.
-
-----------------------------------------------------------------------------
-----------------------------------------------------------------------------
-
--- In order so that we can compare running it single-threaded
-(like it was before) to multi-threaded, let's add another command-line flag.
-
--- we now turn our attention to the command_line_handler() function.
-
--- let's rename "is_random" to "do_random".
-
--- let's add a new "do_threaded".
-
--- let's make both of those defaulted to "false". although doesnt matter,
-it will not run unless ALL parameters are specified by user.
-
-
--- let's change number of valid arg from 5 to 6.
-
--- now at the end(bottom) of our "match args.len()" block, let's add 
-the handling of the new "do_threaded" flag.
-
--- let's also improve both the "do_random" and the "do_threaded" by converting
-each to "match {}"  and also being explicit with "y" and "n" and all other inputs.
-All other inputs, we do a "usage()" and exit.
-
-
--- next, at bottom of the command handler function, we need to add the new
-"do_threaded" flag to our printout as well as the return expression.
-
--- and finally, we need to change the handler func definiton to return that new value
-So we add another "bool" to the return signature.
-
-
- fn command_line_handler() -> (u32, u32, u64, bool, bool) {
-      let mut num_books:u32 = 1;
-      let mut num_loops:u32 = 1;
-      let mut delay_ms:u64  = 1;
-      let mut do_random:bool = false;
-      let mut do_threaded:bool = false;
- 
-      let args:Vec<String> = args().collect();
- 
-      match args.len() {
- 
-          6         => {
-
-
-
-                          // ....blah blah..... lots of code here
-
-
-
-                          match &args[4] {
-                              "n" => do_random = false,
-                              "y" => do_random = true,
-                              _   => usage()
-                          }
-
-                          match &args[5] {
-                              "n" => do_threaded = false,
-                              "y" => do_threaded = true,
-                              _   => usage()
-                          }
-
-                      }
-          _         => usage()
- 
-      }
- 
-  
-     // ....blah blah..... lots of code here
-
-
-     println!("Running with nbks: {} , nloops: {}, ms: {}, rnd: {:?}, thrd:{:?}",
-         num_books, num_loops, delay_ms, do_random, do_threaded);
-
-     (num_books, num_loops, delay_ms, do_random, do_threaded)
-
- }
-
-
-
-
-
-
-error[E0308]: mismatched types
-  --> src/main.rs:23:9
-   |
-23 |     let (num_books, num_loops, delay_ms, is_random) = command_line_handler();
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^   ---------------------- this expression has type `(u32, u32, u64, bool, bool)`
-   |         |
-   |         expected a tuple with 5 elements, found one with 4 elements
-   |
-   = note: expected tuple `(u32, u32, u64, bool, bool)`
-              found tuple `(_, _, _, _)`
-
-error[E0308]: mismatched types
-  --> src/main.rs:81:31
-   |
-81 |                         match &args[4] {
-   |                               ^^^^^^^^ expected `str`, found struct `std::string::String`
-
-error[E0308]: mismatched types
-  --> src/main.rs:87:31
-   |
-87 |                         match &args[5] {
-   |                               ^^^^^^^^ expected `str`, found struct `std::string::String
-
-
-
-
-----------------------------------------------------------------------------
--- the first error above is because when we call the handler in main(), we are only grabbing 4 return values instaed of 5.
-We will fix that, but let's first handle the other errors.
-
-let's try adding ".as_str()" to the indexed args array 
-
-
-
-                          // ....blah blah..... lots of code here
-
-
-                          match &args[4].as_str() {
-                              "n" => do_random = false,
-                              "y" => do_random = true,
-                              _   => usage()
-                          }
- 
-                          match &args[5].as_str() {
-                              "n" => do_threaded = false,
-                              "y" => do_threaded = true,
-                              _   => usage()
-                          }
- 
-                      }
-          _         => usage()
- 
-      }
-
-
-      // ....blah blah..... lots of code here
-
-
-
-We get different errors.
-
-
-----------------------------------------------------------------------------
--- let's enclose part of this in parentheses.
-
-
-
-                          // ....blah blah..... lots of code here
-
-
-                          match (&args[4]).as_str() {
-                              "n" => do_random = false,
-                              "y" => do_random = true,
-                              _   => usage()
-                          }
- 
-                          match (&args[5]).as_str() {
-                              "n" => do_threaded = false,
-                              "y" => do_threaded = true,
-                              _   => usage()
-                          }
- 
-                      }
-          _         => usage()
- 
-      }
-
-
-      // ....blah blah..... lots of code here
-
-
-And that worked!   the remaining error is in main() because we need to handle the new return value
-
-
-----------------------------------------------------------------------------
--- first, we add in the new return.
--- lets make sure we use the renamed "do_random" everywhere instead of "is_random".
-
-
-  fn main() {
- 
-      // ....blah blah..... lots of code here
- 
- 
-      let (num_books, num_loops, delay_ms, do_random, do_threaded) = command_line_handler();
-
- 
-      // ....blah blah..... lots of code here
-
-
-      for _i in 0..num_loops {
-
- 
-          // ....blah blah..... lots of code here
-
- 
-          thread::spawn(move || { query_cache(id); } );
- 
-          thread::spawn(move || { query_database(num_books as usize, id, delay_ms); });
- 
-      }
- 
-      // ....blah blah..... lots of code here
-  }
-
-
-On compiling, no errors, just a warning.
-
-
-
-----------------------------------------------------------------------------
--- now we are ready to actually use our new return value "do_threaded".
-
-  fn main() {
- 
-      // ....blah blah..... lots of code here
- 
- 
-      let (num_books, num_loops, delay_ms, do_random, do_threaded) = command_line_handler();
-
- 
-      // ....blah blah..... lots of code here
-
-
-      for _i in 0..num_loops {
-
- 
-          // ....blah blah..... lots of code here
-
- 
-          if do_threaded {
-                thread::spawn(move || { query_cache(id); } );
-                thread::spawn(move || { query_database(num_books as usize, id, delay_ms); });
-         } else {
-                query_cache(id);
-                query_database(num_books as usize, id, delay_ms);
-         }
- 
-      }
- 
-      // ....blah blah..... lots of code here
-  }
-
-
-SUCCESS!   no errors, no warnings.
-
-
-----------------------------------------------------------------------------
--- now we add the new do_threaded to our usage statement.
-
-fn usage() {
-    let args:Vec<String> = args().collect();
-    println!("");
-    println!("");
-    println!("usage: {} <num_books>, <num_loops> <delay_ms> <do_random> <do_threaded>", &args[0]);
-    println!("");
-    println!("");
-    exit(1);
 }
 
-
-
-----------------------------------------------------------------------------
--- we still are not yet ready to run it and really be able to do any comparison.
-
--- I would like to improve how main() waits for everything to finish.
-Right now we have a blind  1000ms wait.
-I dont want to add any code to join() on threads.. we are creating a bunch of threads and
-I just dont want to get into doing that. it isn't the main point of this exercise.
-
-I just want to improve how man millis seconds it waits, which depends on whether it's
-running single or multi threaded.
-
-In single threaded mode, the query database delays all add up.  In multi threaded, they really dont.
-
---So, we do the following:
-
-      if do_threaded {
-          thread::sleep(Duration::from_millis(1000));
-      } else {
-          thread::sleep(Duration::from_millis((num_loops as u64) * delay_ms));
-      }
-      println!("Main is DONE, we may not have finished filling cache with all books.");
- 
+------------------------------------------------------------------------------------
+the problem with the above is that some times the cache will NOT fill and main
+would wait indefinitely.  So we need a fail safe timeout.
 
 
 
-SUCCESS!
-
-
-myuser@L07705EliezerC:~/projects/rust/concurrency$ cargo run 40 204 10 n y
-    Finished dev [unoptimized + debuginfo] target(s) in 0.06s
-     Running `target/debug/concurrency 40 204 10 n y`
-Running with nbks: 40 , nloops: 204, ms: 10, rnd: false, thrd:true
-.................................................................................14 .15 .15 .16 .16 .16 .19 .19 .19 .19 .19 .21 .22 .24 .24 .24 .24 .24 .26 .26 .26 .28 .29 .29 .30 .30 .31 .32 .33 .33 .33 .35 ...36 .37 .40 40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 ..40 .40 .40 .40 .40 .40 40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40 .40
-
-Main is waiting....
-Main is DONE, we may not have finished filling cache with all books.
-
-
-
-----------------------------------------------------------------------------
---I want to fix some of what we see.
-
--- first, main() doesn't know whether we filled the cache or not.
-
--- second, we keep running the program even after we have filled the cache.
-
--- the above to issues are related.
-
-
--- one way (not the best) is to add something to the query_cache() to quit as soon as it's filled,
-since it's the one that first knows, and has access to the info.
-
--- let's first create a new function, "exit_early()", similar to "usage()".
-
- fn exit_when_full() {
-     println!("");
-     println!("");
-     println!("Cache is full, exiting early.");
-     println!("");
-     println!("");
-     exit(0);
- }
-
-
--- then, let's call this from "query_cache()"
-
-
- fn query_cache(rndid:u32) {
-
-      // ....blah blah..... lots of code here
-
-     if len >= BOOKS.len() {
-         exit_when_full();
-     }
- }
-
-
-There!  we solved our issues.  It quits when full, and we know why it quit.
-
-myuser@L07705EliezerC:~/projects/rust/concurrency$ cargo run 40 204 10 n y
-   Compiling concurrency v0.1.0 (/home/myuser/projects/rust/concurrency)
-    Finished dev [unoptimized + debuginfo] target(s) in 2.81s
-     Running `target/debug/concurrency 40 204 10 n y`
-Running with nbks: 40 , nloops: 204, ms: 10, rnd: false, thrd:true
-.................................................................................21 .22 .22 .24 .24 .25 .25 .25 .26 .26 .27 .28 .29 .29 .29 .30 .30 .32 .33 .33 .34 .35 .36 .36 .36 .36 .39 .40
-
-Cache is full, exiting early.
-
-
-----------------------------------------------------------------------------
--- BUT, you say, that's not right... that's bad programming.  why should
-a function have what amounts to a hidden side-effect; something as 
-major as exiting the entire program?  Especially terminiating the program
-from a child thread?
-
-I would agree.  Terrible solution.
-
--- Perhaps we could have the function / thread return a  status.
-My issue with doing that, though, is that now we have to have main()
-track the threads (get handles)  and join them, so that we can get
-a single status from only ONE of those many threads.
-
--- Luckily/lazyly for me, our cache is global static.. so main() iself
-can know the length of it at any time.
-
--- and we remove from query_cache();
-
- fn main() {
- 
- 
-      // ....blah blah..... lots of code here
- 
- 
-      for _i in 0..num_loops {
- 
-          if CACHE.lock().unwrap().len() >= BOOKS.len() {
-              exit_when_full();
-          }
- 
-
-          // ....blah blah..... lots of code here
-
- 
-      }
- 
-
-      // ....blah blah..... lots of code here
-
+    println!("");
+    println!("");
+    println!("Main is waiting....");
+    let mut timed_out = false;
+    let since_start_wait_for_cache_full = Instant::now();
+    while CACHE.lock().unwrap().len() < (num_books as usize) {
+        if since_start_wait_for_cache_full.elapsed() > Duration::from_millis(2000) {
+            timed_out = true;
+            break;
+        }
+        thread::sleep(Duration::from_millis(1));
+    }
+    println!("");
+    if timed_out {
+        println!("Main timed OUT, we may not have finished filling cache with all books.");
+    } else {
+        println!("Main done, cache full.");
+    }
+    println!("Elapsed time: {:.2?}", since_start.elapsed());
+    println!("");
 }
 
 
 
 
-----------------------------------------------------------------------------
--- We are almost ready to do a comparison.
-
-Let's add in some elapsed time measurement, like we did in the video covering threads and closures.
 
 
-// ....blah blah..... lots of code here
+------------------------------------------------------------------------------------
 
-use std::time::{ Duration, Instant };
-
-// ....blah blah..... lots of code here
-
-
-fn main() {
-
-      let since_start = Instant::now();
-
-
-      // ....blah blah..... lots of code here
-
-
-      for _i in 0..num_loops {
- 
-
-          if CACHE.lock().unwrap().len() >= BOOKS.len() {
-              exit_when_full();
-          }
-
-
-          // ....blah blah..... lots of code here
-      }
-
-
-      println!("");
-      println!("Elapsed time: {:.2?}", since_start.elapsed());
-      println!("");
-} 
-
-
-THe above sort of works.  We dont get an elapsed time if it exits early.
-
-
-
-----------------------------------------------------------------------------
--- pass "since_start" to "exit_when_full()".
-
-
-          if CACHE.lock().unwrap().len() >= BOOKS.len() {
-              exit_when_full(since_start);
-          }
-
- 
--- use it in "exit_when_full()".
-
-
- fn exit_when_full(since_start:Instant) {
-     println!("");
-     println!("");
-     println!("Cache is full, exiting early.");
-     println!("");
-     println!("Elapsed time: {:.2?}", since_start.elapsed());
-     println!("");
-     exit(0);
- }
-
-
+Now there is an issue .   the longer the delay in the query_database, the more the probability
+that it will be 

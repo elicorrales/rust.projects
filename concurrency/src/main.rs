@@ -3,7 +3,7 @@ use book::*;
 use std::collections::HashMap;
 use rand::*;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::io::Write;
 use std::env::args;
 use std::process::exit;
@@ -13,10 +13,14 @@ use std::sync::Mutex;
 
 lazy_static! {
     static ref CACHE:Mutex<HashMap<u32, Book>> = Mutex::new(HashMap::new());
+    static ref START:Instant = Instant::now();
+    static ref EXITING:Mutex<bool> = Mutex::new(false);
 }
 
+//=========================================================================================
 fn main() {
 
+    START.elapsed();
 
     let mut rng = thread_rng();
 
@@ -36,10 +40,10 @@ fn main() {
         }
 
         if do_threaded {
-            thread::spawn(move || { query_cache(id); } );
+            thread::spawn(move || { query_cache(id, num_books as usize); } );
             thread::spawn(move || { query_database(num_books as usize, id, delay_ms); });
         } else {
-            query_cache(id);
+            query_cache(id, num_books as usize);
             query_database(num_books as usize, id, delay_ms);
         }
 
@@ -49,12 +53,19 @@ fn main() {
     println!("");
     println!("Main is waiting....");
     thread::sleep(Duration::from_millis(1000));
-    println!("");
-    println!("Main is done...don't know if we filled cache.");
-    println!("");
+
+    if *EXITING.lock().unwrap() != true {
+
+        println!("");
+        println!("Main is done.");
+        println!("");
+        println!("{:.2?}", START.elapsed());
+        println!("");
+    }
 }
 
 
+//=========================================================================================
 fn command_line_handler() -> (u32, u32, u64, bool, bool) {
     let mut num_books:u32 = 1;
     let mut num_loops:u32 = 1;
@@ -65,23 +76,15 @@ fn command_line_handler() -> (u32, u32, u64, bool, bool) {
     let args:Vec<String> = args().collect();
 
     match args.len() {
-
         6         => {
                         let result = <u32 as FromStr>::from_str(&args[1]);
-                        if result.is_ok() {
-                            num_books = result.unwrap();
-                        } else { usage(); }
+                        if result.is_ok() { num_books = result.unwrap(); } else { usage(); }
 
                         let result = <u32 as FromStr>::from_str(&args[2]);
-                        if result.is_ok() {
-                            num_loops = result.unwrap();
-                        } else { usage(); }
+                        if result.is_ok() { num_loops = result.unwrap(); } else { usage(); }
 
                         let result2 = <u64 as FromStr>::from_str(&args[3]);
-                        if result2.is_ok() {
-                            delay_ms = result2.unwrap();
-                        } else { usage(); }
-
+                        if result2.is_ok() { delay_ms = result2.unwrap(); } else { usage(); }
 
                         match (&args[4]).as_str() {
                             "n" => do_random = false,
@@ -94,7 +97,6 @@ fn command_line_handler() -> (u32, u32, u64, bool, bool) {
                             "y" => do_threaded = true,
                             _   => usage()
                         }
-
                     }
         _         => usage()
 
@@ -121,6 +123,7 @@ fn command_line_handler() -> (u32, u32, u64, bool, bool) {
 
 
 
+//=========================================================================================
 fn usage() {
     let args:Vec<String> = args().collect();
     println!("");
@@ -131,20 +134,23 @@ fn usage() {
     exit(1);
 }
 
-
+//=========================================================================================
 fn exit_when_full() {
-    println!("");
-    println!("");
-    println!("Cache is full.");
-    println!("");
-    println!("");
-    exit(1);
+    if *EXITING.lock().unwrap() != true {
+        println!("");
+        println!("");
+        println!("Cache is full.");
+        println!("");
+        println!("");
+        println!("{:.2?}", START.elapsed());
+        *EXITING.lock().unwrap() = true;
+    }
+    exit(0);
 }
 
 
-
-
-fn query_cache(rndid:u32) {
+//=========================================================================================
+fn query_cache(rndid:u32, num_books:usize) {
 
     print!(".");
 
@@ -156,16 +162,21 @@ fn query_cache(rndid:u32) {
         None    => {}
     }
     std::io::stdout().flush().unwrap();
+
+    if len >= num_books {
+        exit_when_full();
+    }
+
 }
 
 
 
+//============================================================================================
 fn query_database(num_books:usize, rndid:u32, delay_ms:u64) {
     thread::sleep(Duration::from_millis(delay_ms));
     for i in 0..num_books {
         let id = BOOKS[i].id;
         if id == rndid {
-            //let book = BookCopy { id: BOOKS[i].id, author: BOOKS[i].author.to_string() };
             CACHE.lock().unwrap().insert(id, BOOKS[i]);
             break;
         }
