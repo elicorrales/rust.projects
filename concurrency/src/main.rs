@@ -17,7 +17,7 @@ lazy_static! {
     static ref EXITING:Mutex<bool> = Mutex::new(false);
 }
 
-//=========================================================================================
+//==========================================================================
 fn main() {
 
     START.elapsed();
@@ -54,18 +54,18 @@ fn main() {
     println!("Main is waiting....");
     thread::sleep(Duration::from_millis(1000));
 
-    if *EXITING.lock().unwrap() != true {
+    //if *EXITING.lock().unwrap() != true {
 
         println!("");
         println!("Main is done.");
         println!("");
         println!("{:.2?}", START.elapsed());
         println!("");
-    }
+    //}
 }
 
 
-//=========================================================================================
+//==========================================================================
 fn command_line_handler() -> (u32, u32, u64, bool, bool) {
     let mut num_books:u32 = 1;
     let mut num_loops:u32 = 1;
@@ -123,7 +123,7 @@ fn command_line_handler() -> (u32, u32, u64, bool, bool) {
 
 
 
-//=========================================================================================
+//==========================================================================
 fn usage() {
     let args:Vec<String> = args().collect();
     println!("");
@@ -134,22 +134,20 @@ fn usage() {
     exit(1);
 }
 
-//=========================================================================================
+//==========================================================================
 fn exit_when_full() {
-    if *EXITING.lock().unwrap() != true {
-        println!("");
-        println!("");
-        println!("Cache is full.");
-        println!("");
-        println!("");
-        println!("{:.2?}", START.elapsed());
-        *EXITING.lock().unwrap() = true;
-    }
+    let exiting = *EXITING.lock().unwrap();
+    println!("");
+    println!("");
+    println!("Cache is full.");
+    println!("");
+    println!("");
+    println!("{:.2?}", START.elapsed());
     exit(0);
 }
 
 
-//=========================================================================================
+//==========================================================================
 fn query_cache(rndid:u32, num_books:usize) {
 
     print!(".");
@@ -171,7 +169,7 @@ fn query_cache(rndid:u32, num_books:usize) {
 
 
 
-//============================================================================================
+//==========================================================================
 fn query_database(num_books:usize, rndid:u32, delay_ms:u64) {
     thread::sleep(Duration::from_millis(delay_ms));
     for i in 0..num_books {
