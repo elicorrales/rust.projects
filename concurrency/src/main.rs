@@ -54,14 +54,11 @@ fn main() {
     println!("Main is waiting....");
     thread::sleep(Duration::from_millis(1000));
 
-    //if *EXITING.lock().unwrap() != true {
-
-        println!("");
-        println!("Main is done.");
-        println!("");
-        println!("{:.2?}", START.elapsed());
-        println!("");
-    //}
+    println!("");
+    println!("Main is done.");
+    println!("");
+    println!("{:.2?}", START.elapsed());
+    println!("");
 }
 
 
@@ -136,13 +133,15 @@ fn usage() {
 
 //==========================================================================
 fn exit_when_full() {
-    let exiting = *EXITING.lock().unwrap();
+    let exiting = EXITING.lock();
+    println!("{:?}",exiting);
     println!("");
     println!("");
     println!("Cache is full.");
     println!("");
     println!("");
     println!("{:.2?}", START.elapsed());
+    //thread::sleep(Duration::from_millis(2000));
     exit(0);
 }
 
@@ -150,7 +149,10 @@ fn exit_when_full() {
 //==========================================================================
 fn query_cache(rndid:u32, num_books:usize) {
 
-    print!(".");
+    {
+        let exiting = EXITING.lock();
+        print!(".");
+    }
 
     let rcache = CACHE.lock().unwrap();
     let len    = rcache.len();
